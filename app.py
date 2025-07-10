@@ -27,8 +27,6 @@ with left_col:
     price_label = "AEMP price:" if price_type == "AEMP" else "DPMQ price:"
     input_price = st.number_input(price_label, min_value=0.0, step=0.01, format="%.2f")
 
-    from decimal import Decimal
-
     MIN_DPMQ = Decimal("13.88")
 
     if price_type == "DPMQ" and Decimal(input_price) < MIN_DPMQ:
@@ -59,26 +57,12 @@ with left_col:
     </div>
     """, unsafe_allow_html=True)
 
-
 # 4. CALCULATION FUNCTIONS
 
 def calculate_aemp_max_qty(input_price, pricing_qty, max_qty):
     if pricing_qty == 0:  # avoid division by zero
         return 0.0
     return (input_price * max_qty) / pricing_qty
-
-
-def calculate_wholesale_markup(aemp_max_qty):
-    if aemp_max_qty <= 5.50:
-        return 0.41
-    elif aemp_max_qty <= 720.00:
-        return aemp_max_qty * 0.0752
-    else:
-        return 54.14
-
-
-def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
-    return aemp_max_qty + wholesale_markup
 
 
 def calculate_ahi_fee(price_to_pharmacist):
@@ -98,7 +82,7 @@ def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
 
 def get_wholesale_tier(dpmq):
     """
-    Determines the wholesale tier based on final pharmacy price (DPMQ).
+    Determines the forward pricing wholesale tier based on final pharmacy price (DPMQ).
     """
     if dpmq <= Decimal("19.37"):
         return "Tier1"
@@ -107,20 +91,19 @@ def get_wholesale_tier(dpmq):
     else:
         return "Tier3"
 
-def get_inverse_tier_type(dpmq, dispensing_fee):
+# 🔁 INVERSE SECTION – STARTS HERE
+def get_inverse_tier_type(dpmq):
     """
-    Determine which tier applies based on the Final Pharmacy Price (DPMQ) minus the dispensing fee.
+    Determines the inverse wholesale tier based on Final Pharmacy Price (DPMQ).
     """
     from decimal import Decimal
-
-    pharmacist_price = Decimal(dpmq) - Decimal(dispensing_fee)
-
-    if pharmacist_price <= Decimal("19.37"):
+    if Decimal(dpmq) <= Decimal("19.37"):
         return "Tier1"
-    elif pharmacist_price <= Decimal("821.31"):
+    elif Decimal(dpmq) <= Decimal("821.31"):
         return "Tier2"
     else:
         return "Tier3"
+
 
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
     """
@@ -142,19 +125,18 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
         return dpmq - dispensing_fee - Decimal("99.79") - Decimal("54.14")
 
     else:
-        return Decimal("0.00")  # fallback in case tier is undefined
+        return Decimal("0.00")  # fallback
+
 
 def calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty):
     """
     Converts the AEMP for maximum quantity into the unit-level AEMP.
     Formula: AEMP = (AEMP_Max_Qty / Max_Qty) * Pricing_Qty
     """
-    from decimal import Decimal
-
     if max_qty == 0:
         return Decimal("0.00")
-
     return (Decimal(aemp_max_qty) / Decimal(max_qty)) * Decimal(pricing_qty)
+
 
 def calculate_inverse_wholesale_markup(aemp_max_qty):
     """
@@ -173,11 +155,13 @@ def calculate_inverse_wholesale_markup(aemp_max_qty):
     else:
         return Decimal("54.14")
 
+
 def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
     """
     Adds AEMP (max qty) and wholesale markup to get the subtotal price to pharmacist.
     """
     return aemp_max_qty + wholesale_markup
+
 
 def calculate_inverse_ahi_fee(price_to_pharmacist):
     """
@@ -192,6 +176,7 @@ def calculate_inverse_ahi_fee(price_to_pharmacist):
     else:
         return Decimal("99.79")
 
+
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
     """
     Final DPMQ calculation from price to pharmacist + AHI + Dispensing Fee [+ Dangerous Fee if included].
@@ -200,6 +185,7 @@ def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include
 
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
     return price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
+
 
 def generate_cost_breakdown_df(
     aemp_max_qty,
@@ -212,9 +198,7 @@ def generate_cost_breakdown_df(
     final_price,
     label="AEMP"
 ):
-    data = [
-        ["AEMP for max quantity", f"${aemp_max_qty:.2f}"],
-    ]
+    data = [["AEMP for max quantity", f"${aemp_max_qty:.2f}"]]
 
     if unit_aemp is not None:
         data.append(["Unit AEMP", f"${unit_aemp:.2f}"])
@@ -255,6 +239,7 @@ def display_cost_breakdown(
     else:
         st.markdown(f"### 💊 DPMQ: **${final_price:.2f}**")
 
+
 # 5. RIGHT PANEL – OUTPUT BREAKDOWN
 
 with right_col:
@@ -267,72 +252,72 @@ with right_col:
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
         dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
-        dispensing_fee = Decimal("8.67")  # or 11.39 later if needed
+        dispensing_fee = Decimal("8.67")
 
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
         st.markdown("### 🧮 COST BREAKDOWN (Inverse)")
         st.write(f"**Tier used:** {tier}")
         st.write(f"**AEMP for max quantity:** ${aemp_max_qty:.2f}")
-        
-display_cost_breakdown(
-    aemp_max_qty, unit_aemp, wholesale_markup,
-    price_to_pharmacist, ahi_fee, dispensing_fee,
-    dangerous_fee, dpmq, label="DPMQ"
-)
 
-import io
+        display_cost_breakdown(
+            aemp_max_qty, unit_aemp, wholesale_markup,
+            price_to_pharmacist, ahi_fee, dispensing_fee,
+            dangerous_fee, dpmq, label="DPMQ"
+        )
 
-df = generate_cost_breakdown_df(
-    aemp_max_qty, unit_aemp, wholesale_markup,
-    price_to_pharmacist, ahi_fee, dispensing_fee,
-    dangerous_fee, dpmq, label="DPMQ"
-)
+        import io
+        df = generate_cost_breakdown_df(
+            aemp_max_qty, unit_aemp, wholesale_markup,
+            price_to_pharmacist, ahi_fee, dispensing_fee,
+            dangerous_fee, dpmq, label="DPMQ"
+        )
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-    df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+        st.download_button(
+            label="📥 Download DPMQ Breakdown as Excel",
+            data=buffer.getvalue(),
+            file_name="dpmpq_breakdown.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-st.download_button(
-    label="📥 Download DPMQ Breakdown as Excel",
-    data=buffer.getvalue(),
-    file_name="dpmpq_breakdown.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    elif price_type == "AEMP":
+        aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
+        wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
+        price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
+        ahi_fee = calculate_ahi_fee(price_to_pharmacist)
+        dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
+        dispensing_fee = Decimal("8.67")
+        dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
 
-elif price_type == "AEMP":
-    aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
-    wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
-    price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
-    ahi_fee = calculate_ahi_fee(price_to_pharmacist)
-    dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
+        display_cost_breakdown(
+            aemp_max_qty,
+            None,
+            wholesale_markup,
+            price_to_pharmacist,
+            ahi_fee,
+            dispensing_fee,
+            dangerous_fee,
+            dpmq,
+            label="AEMP"
+        )
 
-    display_cost_breakdown(
-        aemp_max_qty,
-        None,  # unit_aemp not needed in AEMP mode
-        wholesale_markup,
-        price_to_pharmacist,
-        ahi_fee,
-        Decimal("8.67"),
-        Decimal("4.46") if include_dangerous_fee else Decimal("0.00"),
-        dpmq,
-        label="AEMP"
-    )
-df = generate_cost_breakdown_df(
-    aemp_max_qty, None, wholesale_markup,
-    price_to_pharmacist, ahi_fee, Decimal("8.67"),
-    Decimal("4.46") if include_dangerous_fee else Decimal("0.00"),
-    dpmq, label="AEMP"
-)
+        df = generate_cost_breakdown_df(
+            aemp_max_qty, None, wholesale_markup,
+            price_to_pharmacist, ahi_fee, dispensing_fee,
+            dangerous_fee, dpmq, label="AEMP"
+        )
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-    df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+        st.download_button(
+            label="📥 Download AEMP Breakdown as Excel",
+            data=buffer.getvalue(),
+            file_name="aemp_breakdown.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-st.download_button(
-    label="📥 Download AEMP Breakdown as Excel",
-    data=buffer.getvalue(),
-    file_name="aemp_breakdown.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
 
