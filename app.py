@@ -2,6 +2,9 @@
 import streamlit as st
 import pandas as pd
 from decimal import Decimal, ROUND_HALF_UP, getcontext
+import io
+import os
+os.system("pip install xlsxwriter")  # ✅ Ensures Excel export works
 
 getcontext().prec = 10  # Ensures cent-level accuracy for pricing
 
