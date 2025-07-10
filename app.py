@@ -239,20 +239,19 @@ def display_cost_breakdown(
     else:
         st.markdown(f"### 💊 DPMQ: **${final_price:.2f}**")
 
-
 # 5. RIGHT PANEL – OUTPUT BREAKDOWN
 
 with right_col:
 
     if price_type == "DPMQ":
-        tier = get_inverse_tier_type(input_price, dispensing_type)
-        aemp_max_qty = calculate_inverse_aemp_max(input_price, dispensing_type, tier)
+        dispensing_fee = Decimal("8.67")
+        tier = get_inverse_tier_type(input_price)
+        aemp_max_qty = calculate_inverse_aemp_max(input_price, dispensing_fee, tier)
         unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
         wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
         dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
-        dispensing_fee = Decimal("8.67")
 
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
@@ -284,12 +283,12 @@ with right_col:
         )
 
     elif price_type == "AEMP":
+        dispensing_fee = Decimal("8.67")
         aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
-        wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
+        wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)  # ✅ fixed
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
         dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
-        dispensing_fee = Decimal("8.67")
         dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
 
         display_cost_breakdown(
@@ -319,5 +318,7 @@ with right_col:
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+
 
 
