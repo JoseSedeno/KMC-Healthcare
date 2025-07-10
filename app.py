@@ -60,30 +60,29 @@ with left_col:
 # 4. CALCULATION FUNCTIONS
 
 def calculate_aemp_max_qty(input_price, pricing_qty, max_qty):
-    if pricing_qty == 0:  # avoid division by zero
-        return 0.0
-    return (input_price * max_qty) / pricing_qty
+    if pricing_qty == 0:
+        return Decimal("0.00")
+    return (Decimal(input_price) * Decimal(max_qty)) / Decimal(pricing_qty)
 
 
 def calculate_ahi_fee(price_to_pharmacist):
-    if price_to_pharmacist < 100:
-        return 4.79
-    elif price_to_pharmacist <= 2000:
-        return 4.79 + 0.05 * (price_to_pharmacist - 100)
+    price_to_pharmacist = Decimal(price_to_pharmacist)
+    if price_to_pharmacist < Decimal("100"):
+        return Decimal("4.79")
+    elif price_to_pharmacist <= Decimal("2000"):
+        return Decimal("4.79") + Decimal("0.05") * (price_to_pharmacist - Decimal("100"))
     else:
-        return 99.79  # 4.79 + 95
+        return Decimal("99.79")
 
 
 def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
-    dispensing_fee = 8.67
-    dangerous_fee = 4.46 if include_dangerous else 0.0
-    return price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
+    dispensing_fee = Decimal("8.67")
+    dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
+    return Decimal(price_to_pharmacist) + Decimal(ahi_fee) + dispensing_fee + dangerous_fee
 
 
 def get_wholesale_tier(dpmq):
-    """
-    Determines the forward pricing wholesale tier based on final pharmacy price (DPMQ).
-    """
+    dpmq = Decimal(dpmq)
     if dpmq <= Decimal("19.37"):
         return "Tier1"
     elif dpmq <= Decimal("821.31"):
@@ -91,24 +90,19 @@ def get_wholesale_tier(dpmq):
     else:
         return "Tier3"
 
+
 # 🔁 INVERSE SECTION – STARTS HERE
 def get_inverse_tier_type(dpmq):
-    """
-    Determines the inverse wholesale tier based on Final Pharmacy Price (DPMQ).
-    """
-    from decimal import Decimal
-    if Decimal(dpmq) <= Decimal("19.37"):
+    dpmq = Decimal(dpmq)
+    if dpmq <= Decimal("19.37"):
         return "Tier1"
-    elif Decimal(dpmq) <= Decimal("821.31"):
+    elif dpmq <= Decimal("821.31"):
         return "Tier2"
     else:
         return "Tier3"
 
 
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
-    """
-    Calculate the AEMP (max quantity) from DPMQ, using PBS inverse logic.
-    """
     dpmq = Decimal(dpmq)
     dispensing_fee = Decimal(dispensing_fee)
 
@@ -124,30 +118,17 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
     elif tier == "Tier3":
         return dpmq - dispensing_fee - Decimal("99.79") - Decimal("54.14")
 
-    else:
-        return Decimal("0.00")  # fallback
+    return Decimal("0.00")  # fallback
 
 
 def calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty):
-    """
-    Converts the AEMP for maximum quantity into the unit-level AEMP.
-    Formula: AEMP = (AEMP_Max_Qty / Max_Qty) * Pricing_Qty
-    """
     if max_qty == 0:
         return Decimal("0.00")
     return (Decimal(aemp_max_qty) / Decimal(max_qty)) * Decimal(pricing_qty)
 
 
 def calculate_inverse_wholesale_markup(aemp_max_qty):
-    """
-    Calculates the wholesale markup based on the AEMP (max quantity).
-    Uses PBS Tiered Markup rules:
-    - Tier 1: $0.41
-    - Tier 2: 7.52% of AEMP
-    - Tier 3: $54.14
-    """
-    from decimal import Decimal
-
+    aemp_max_qty = Decimal(aemp_max_qty)
     if aemp_max_qty <= Decimal("5.50"):
         return Decimal("0.41")
     elif aemp_max_qty <= Decimal("720.00"):
@@ -157,18 +138,11 @@ def calculate_inverse_wholesale_markup(aemp_max_qty):
 
 
 def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
-    """
-    Adds AEMP (max qty) and wholesale markup to get the subtotal price to pharmacist.
-    """
-    return aemp_max_qty + wholesale_markup
+    return Decimal(aemp_max_qty) + Decimal(wholesale_markup)
 
 
 def calculate_inverse_ahi_fee(price_to_pharmacist):
-    """
-    Calculates the AHI (Admin, Handling, Infrastructure) fee based on PBS tiers.
-    """
-    from decimal import Decimal
-
+    price_to_pharmacist = Decimal(price_to_pharmacist)
     if price_to_pharmacist <= Decimal("100.00"):
         return Decimal("4.79")
     elif price_to_pharmacist <= Decimal("2000.00"):
@@ -178,13 +152,8 @@ def calculate_inverse_ahi_fee(price_to_pharmacist):
 
 
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
-    """
-    Final DPMQ calculation from price to pharmacist + AHI + Dispensing Fee [+ Dangerous Fee if included].
-    """
-    from decimal import Decimal
-
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
-    return price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
+    return Decimal(price_to_pharmacist) + Decimal(ahi_fee) + Decimal(dispensing_fee) + dangerous_fee
 
 
 def generate_cost_breakdown_df(
@@ -198,23 +167,23 @@ def generate_cost_breakdown_df(
     final_price,
     label="AEMP"
 ):
-    data = [["AEMP for max quantity", f"${aemp_max_qty:.2f}"]]
+    data = [["AEMP for max quantity", f"${Decimal(aemp_max_qty):.2f}"]]
 
     if unit_aemp is not None:
-        data.append(["Unit AEMP", f"${unit_aemp:.2f}"])
+        data.append(["Unit AEMP", f"${Decimal(unit_aemp):.2f}"])
 
     data.extend([
-        ["Wholesale markup", f"${wholesale_markup:.2f}"],
-        ["Price to pharmacist", f"${price_to_pharmacist:.2f}"],
-        ["AHI fee", f"${ahi_fee:.2f}"],
-        ["Dispensing fee", f"${dispensing_fee:.2f}"],
+        ["Wholesale markup", f"${Decimal(wholesale_markup):.2f}"],
+        ["Price to pharmacist", f"${Decimal(price_to_pharmacist):.2f}"],
+        ["AHI fee", f"${Decimal(ahi_fee):.2f}"],
+        ["Dispensing fee", f"${Decimal(dispensing_fee):.2f}"],
     ])
 
-    if dangerous_fee > 0:
-        data.append(["Dangerous drug fee", f"${dangerous_fee:.2f}"])
+    if Decimal(dangerous_fee) > 0:
+        data.append(["Dangerous drug fee", f"${Decimal(dangerous_fee):.2f}"])
 
     label_row = "DPMQ" if label == "DPMQ" else "Final Price"
-    data.append([label_row, f"${final_price:.2f}"])
+    data.append([label_row, f"${Decimal(final_price):.2f}"])
 
     return pd.DataFrame(data, columns=["Component", "Amount"])
 
@@ -225,21 +194,34 @@ def display_cost_breakdown(
     dangerous_fee, final_price, label="AEMP"
 ):
     st.markdown(f"### 💰 COST BREAKDOWN ({label})")
-    st.write(f"**AEMP for max quantity:** ${aemp_max_qty:.2f}")
+    st.write(f"**AEMP for max quantity:** ${Decimal(aemp_max_qty):.2f}")
     if unit_aemp is not None:
-        st.write(f"**Unit AEMP:** ${unit_aemp:.2f}")
-    st.write(f"**Wholesale markup:** ${wholesale_markup:.2f}")
-    st.write(f"**Price to pharmacist:** ${price_to_pharmacist:.2f}")
-    st.write(f"**AHI fee:** ${ahi_fee:.2f}")
-    st.write(f"**Dispensing fee:** ${dispensing_fee:.2f}")
-    if dangerous_fee > 0:
-        st.write(f"**Dangerous drug fee:** ${dangerous_fee:.2f}")
+        st.write(f"**Unit AEMP:** ${Decimal(unit_aemp):.2f}")
+    st.write(f"**Wholesale markup:** ${Decimal(wholesale_markup):.2f}")
+    st.write(f"**Price to pharmacist:** ${Decimal(price_to_pharmacist):.2f}")
+    st.write(f"**AHI fee:** ${Decimal(ahi_fee):.2f}")
+    st.write(f"**Dispensing fee:** ${Decimal(dispensing_fee):.2f}")
+    if Decimal(dangerous_fee) > 0:
+        st.write(f"**Dangerous drug fee:** ${Decimal(dangerous_fee):.2f}")
     if label == "DPMQ":
-        st.markdown(f"### 💊 Reconstructed DPMQ: **${final_price:.2f}**")
+        st.markdown(f"### 💊 Reconstructed DPMQ: **${Decimal(final_price):.2f}**")
     else:
-        st.markdown(f"### 💊 DPMQ: **${final_price:.2f}**")
+        st.markdown(f"### 💊 DPMQ: **${Decimal(final_price):.2f}**")
 
 # 5. RIGHT PANEL – OUTPUT BREAKDOWN
+
+def calculate_wholesale_markup(aemp_max_qty):
+    """
+    FORWARD PBS LOGIC – Calculates wholesale markup based on AEMP.
+    This is different from inverse logic.
+    """
+    aemp_max_qty = Decimal(aemp_max_qty)
+    if aemp_max_qty <= Decimal("5.50"):
+        return Decimal("0.41")
+    elif aemp_max_qty <= Decimal("720.00"):
+        return aemp_max_qty * Decimal("0.0752")
+    else:
+        return Decimal("54.14")
 
 with right_col:
 
@@ -285,7 +267,7 @@ with right_col:
     elif price_type == "AEMP":
         dispensing_fee = Decimal("8.67")
         aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
-        wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)  # ✅ fixed
+        wholesale_markup = calculate_wholesale_markup(aemp_max_qty)  # ✅ correct forward logic
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
         dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
@@ -318,7 +300,5 @@ with right_col:
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
-
 
 
