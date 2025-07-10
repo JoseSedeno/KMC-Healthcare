@@ -29,11 +29,11 @@ with left_col:
 
     from decimal import Decimal
 
-MIN_DPMQ = Decimal("13.88")
+    MIN_DPMQ = Decimal("13.88")
 
-if price_type == "DPMQ" and Decimal(input_price) < MIN_DPMQ:
-    st.error("❌ DPMQ too low. It must be at least $13.88 to cover mandatory PBS fees.")
-    st.stop()
+    if price_type == "DPMQ" and Decimal(input_price) < MIN_DPMQ:
+        st.error("❌ DPMQ too low. It must be at least $13.88 to cover mandatory PBS fees.")
+        st.stop()
 
     col1, col2 = st.columns(2)
     with col1:
@@ -42,11 +42,10 @@ if price_type == "DPMQ" and Decimal(input_price) < MIN_DPMQ:
         max_qty = st.number_input("Maximum quantity:", min_value=1, step=1, format="%d")
 
     include_dangerous_fee = st.toggle("Include dangerous drug fee?")
-    
-    DISPENSING_OPTIONS = ["Ready-prepared"]
-dispensing_type = st.selectbox("Dispensing type:", DISPENSING_OPTIONS)
 
-    
+    DISPENSING_OPTIONS = ["Ready-prepared"]
+    dispensing_type = st.selectbox("Dispensing type:", DISPENSING_OPTIONS)
+
     st.markdown("""
     <div style='font-size: 12px; color: grey; margin-top: 20px;'>
     There might be slight discrepancy in the estimated DPMQ values from the calculator and published DPMQ prices due to rounding of values.  
@@ -55,10 +54,11 @@ dispensing_type = st.selectbox("Dispensing type:", DISPENSING_OPTIONS)
     """, unsafe_allow_html=True)
 
     st.markdown("""
-<div style='margin-top: 20px; font-size: 12px; color: grey;'>
-    Co-developed by: <strong>KMC Healthcare</strong>
-</div>
-""", unsafe_allow_html=True)
+    <div style='margin-top: 20px; font-size: 12px; color: grey;'>
+        Co-developed by: <strong>KMC Healthcare</strong>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # 4. CALCULATION FUNCTIONS
 
