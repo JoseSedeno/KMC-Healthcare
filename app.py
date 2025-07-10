@@ -39,34 +39,66 @@ with left_col:
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div style='margin-top: 20px;'>
-        <span style='font-size: 12px;'>Co-developed by:</span><br>
-        <img src='https://upload.wikimedia.org/wikipedia/commons/4/45/Lucid_logo.svg' width='100'>
-        <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Analytics_icon.svg/1200px-Analytics_icon.svg.png' width='80'>
-    </div>
-    """, unsafe_allow_html=True)
+<div style='margin-top: 20px; font-size: 12px; color: grey;'>
+    Co-developed by: <strong>KMC Healthcare</strong>
+</div>
+""", unsafe_allow_html=True)
 
-# 4. CALCULATION FUNCTIONS (PLACEHOLDER ONLY)
-def calculate_aemp():
-    return 0.00
+# 4. CALCULATION FUNCTIONS
 
-def calculate_dpmq():
-    return 0.00
+def calculate_aemp_max_qty(input_price, pricing_qty, max_qty):
+    if pricing_qty == 0:  # avoid division by zero
+        return 0.0
+    return (input_price * max_qty) / pricing_qty
+
+
+def calculate_wholesale_markup(aemp_max_qty):
+    if aemp_max_qty <= 5.50:
+        return 0.41
+    elif aemp_max_qty <= 720.00:
+        return aemp_max_qty * 0.0752
+    else:
+        return 54.14
+
+
+def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
+    return aemp_max_qty + wholesale_markup
+
+
+def calculate_ahi_fee(price_to_pharmacist):
+    if price_to_pharmacist < 100:
+        return 4.79
+    elif price_to_pharmacist <= 2000:
+        return 4.79 + 0.05 * (price_to_pharmacist - 100)
+    else:
+        return 99.79  # 4.79 + 95
+
+
+def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
+    dispensing_fee = 8.67
+    dangerous_fee = 4.46 if include_dangerous else 0.0
+    return price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
 # 5. RIGHT PANEL – OUTPUT BREAKDOWN
+
 with right_col:
-    st.markdown("### COST BREAKDOWN")
+    st.markdown("### 💰 COST BREAKDOWN")
 
-    st.button("Download", help="Export results", use_container_width=False)
+    aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
+    wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
+    price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
+    ahi_fee = calculate_ahi_fee(price_to_pharmacist)
+    dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
 
-    st.markdown("---")
-    st.write("**AEMP:**", "$0.00")
-    st.write("**AEMP for maximum quantity:**", "$0.00")
-    st.write("**+ Wholesale markup:**", "+ $0.00")
-    st.write("**Price to pharmacists:**", "$0.00")
-    st.write("**+ Administration, handling and infrastructure (AHI) fee:**", "+ $0.00")
-    st.write("**+ Dispensing fee:**", "+ $0.00")
+    st.write(f"**AEMP:** ${input_price:.2f}")
+    st.write(f"**AEMP for maximum quantity:** ${aemp_max_qty:.2f}")
+    st.write(f"+ **Wholesale markup:** + ${wholesale_markup:.2f}")
+    st.write(f"**Price to pharmacists:** ${price_to_pharmacist:.2f}")
+    st.write(f"+ **Administration, handling and infrastructure (AHI) fee:** + ${ahi_fee:.2f}")
+    st.write(f"+ **Dispensing fee:** + $8.67")
+    if include_dangerous_fee:
+        st.write(f"+ **Dangerous drug fee:** + $4.46")
 
-    st.markdown("---")
-    st.write("**DPMQ:**", "**$0.00**")
+    st.markdown(f"### 💊 **DPMQ: ${dpmq:.2f}**")
+
 
