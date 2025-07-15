@@ -271,12 +271,15 @@ with right_col:
 
     if price_type == "DPMQ":
         dispensing_fee = Decimal("8.67")
-        tier = get_inverse_tier_type(input_price)  # ✅ corrected here
+        tier = get_inverse_tier_type(input_price)
         aemp_max_qty = calculate_inverse_aemp_max(input_price, dispensing_fee, tier)
         unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
         wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
-        ahi_fee = calculate_ahi_fee(price_to_pharmacist)
+        
+        # ✅ USE INVERSE AHI FEE FUNCTION HERE
+        ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
+
         dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
 
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
@@ -313,7 +316,10 @@ with right_col:
         aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
         wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
+        
+        # ✅ Forward logic is okay here
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
+
         dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
         dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
 
