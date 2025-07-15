@@ -257,7 +257,7 @@ with right_col:
 
     if price_type == "DPMQ":
         dispensing_fee = Decimal("8.67")
-        tier = get_inverse_tier_type(input_price)
+        tier = get_wholesale_tier(input_price)  # ✅ corrected here
         aemp_max_qty = calculate_inverse_aemp_max(input_price, dispensing_fee, tier)
         unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
         wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
