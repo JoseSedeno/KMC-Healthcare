@@ -95,14 +95,43 @@ def get_wholesale_tier(dpmq):
 
 
 # 🔁 INVERSE SECTION – STARTS HERE
-def get_inverse_tier_type(dpmq):
+
+def precise_inverse_aemp(dpmq, dispensing_fee):
     dpmq = Decimal(dpmq)
-    if dpmq <= Decimal("19.37"):
-        return "Tier1"
-    elif dpmq <= Decimal("821.31"):
-        return "Tier2"
-    else:
-        return "Tier3"
+    dispensing_fee = Decimal(dispensing_fee)
+
+    low = Decimal("0.01")
+    high = Decimal("3000.00")
+    tolerance = Decimal("0.005")
+
+    while high - low > tolerance:
+        aemp = (low + high) / 2
+
+        # Wholesale based on tier
+        if aemp <= Decimal("5.50"):
+            wholesale = Decimal("0.41")
+        elif aemp <= Decimal("720.00"):
+            wholesale = aemp * Decimal("0.0752")
+        else:
+            wholesale = Decimal("54.14")
+
+        ptp = aemp + wholesale
+
+        if ptp <= Decimal("100.00"):
+            ahi = Decimal("4.79")
+        elif ptp <= Decimal("2000.00"):
+            ahi = Decimal("4.79") + Decimal("0.05") * (ptp - Decimal("100.00"))
+        else:
+            ahi = Decimal("99.79")
+
+        reconstructed_dpmq = ptp + ahi + dispensing_fee
+
+        if reconstructed_dpmq > dpmq:
+            high = aemp
+        else:
+            low = aemp
+
+    return ((low + high) / 2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
@@ -113,10 +142,7 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
         return dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
 
     elif tier == "Tier2":
-        if dpmq <= (Decimal("100") + Decimal("4.79") + dispensing_fee):
-            return (dpmq - dispensing_fee - Decimal("4.79")) / Decimal("1.0752")
-        else:
-            return ((dpmq - dispensing_fee + Decimal("0.21")) / Decimal("1.05")) / Decimal("1.0752")
+        return precise_inverse_aemp(dpmq, dispensing_fee)
 
     elif tier == "Tier3":
         return dpmq - dispensing_fee - Decimal("99.79") - Decimal("54.14")
@@ -157,6 +183,7 @@ def calculate_inverse_ahi_fee(price_to_pharmacist):
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
     return Decimal(price_to_pharmacist) + Decimal(ahi_fee) + Decimal(dispensing_fee) + dangerous_fee
+
 
 
 def generate_cost_breakdown_df(
