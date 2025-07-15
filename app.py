@@ -96,6 +96,16 @@ def get_wholesale_tier(dpmq):
 
 # 🔁 INVERSE SECTION – STARTS HERE
 
+def get_inverse_tier_type(dpmq):
+    dpmq = Decimal(dpmq)
+    if dpmq <= Decimal("19.37"):
+        return "Tier1"
+    elif dpmq <= Decimal("821.31"):
+        return "Tier2"
+    else:
+        return "Tier3"
+
+
 def precise_inverse_aemp(dpmq, dispensing_fee):
     dpmq = Decimal(dpmq)
     dispensing_fee = Decimal(dispensing_fee)
@@ -145,6 +155,7 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
         return precise_inverse_aemp(dpmq, dispensing_fee)
 
     elif tier == "Tier3":
+        # ✅ FIXED formula — no binary guessing!
         return dpmq - dispensing_fee - Decimal("99.79") - Decimal("54.14")
 
     return Decimal("0.00")  # fallback
@@ -183,6 +194,7 @@ def calculate_inverse_ahi_fee(price_to_pharmacist):
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
     return Decimal(price_to_pharmacist) + Decimal(ahi_fee) + Decimal(dispensing_fee) + dangerous_fee
+
 
 
 
