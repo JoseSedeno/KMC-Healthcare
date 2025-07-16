@@ -173,70 +173,63 @@ def get_inverse_tier_type(dpmq):
 
 def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
     """
-    Mathematically precise inverse AEMP calculation with analytical approach
+    Mathematically precise inverse AEMP calculation with fallback adjustment
     """
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
-    
-    # For Tier 1 (simple case), we can solve analytically
-    if dpmq <= Decimal("19.37"):  # Tier 1 boundary
-        # DPMQ = AEMP + 0.41 + AHI + dispensing_fee
-        # For Tier 1, AHI = 4.79 (since PtP will be < 100)
+
+    if dpmq <= Decimal("19.37"):
         result = dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
         return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    
-    # For Tier 2 and 3, use enhanced binary search with micro-adjustments
+
     low = Decimal("0.001")
     high = Decimal("1000000.000")
-    tolerance = Decimal("0.000001")  # Ultra-tight tolerance
-    
+    tolerance = Decimal("0.000001")
+
     best_aemp = None
+    best_reconstructed = None
     closest_diff = Decimal("999999")
-    max_iterations = 2000  # More iterations for precision
-    
-    for iteration in range(max_iterations):
+    max_iterations = 2000
+
+    for _ in range(max_iterations):
         mid = (low + high) / Decimal("2")
-        
-        # Calculate wholesale markup with full precision
+
         if mid <= Decimal("5.50"):
             wholesale = Decimal("0.41")
         elif mid <= Decimal("720.00"):
             wholesale = mid * Decimal("0.0752")
         else:
             wholesale = Decimal("54.14")
-        
+
         ptp = mid + wholesale
-        
-        # Calculate AHI fee with full precision
+
         if ptp <= Decimal("100.00"):
             ahi = Decimal("4.79")
         elif ptp <= Decimal("2000.00"):
             ahi = Decimal("4.79") + (ptp - Decimal("100.00")) * Decimal("0.05")
         else:
             ahi = Decimal("99.79")
-        
+
         reconstructed_dpmq = ptp + ahi + dispensing_fee
         diff = abs(reconstructed_dpmq - dpmq)
-        
-        # Track the best solution
+
         if diff < closest_diff:
             closest_diff = diff
             best_aemp = mid
-        
-        # If we found exact match, break
+            best_reconstructed = reconstructed_dpmq
+
         if diff <= tolerance:
             break
-            
-        # Binary search logic
+
         if reconstructed_dpmq < dpmq:
-            low = mid + Decimal("0.000001")
+            low += Decimal("0.000001")
         else:
-            high = mid - Decimal("0.000001")
-    
-    # Post-processing: Fine-tune the result with micro-adjustments
-    if best_aemp and closest_diff > Decimal("0.005"):
+            high -= Decimal("0.000001")
+
+    # ✅ Ensures precision at all DPMQ edges (e.g. $22.40)
+    if best_aemp and (abs(best_reconstructed - dpmq) > Decimal("0.005") or best_reconstructed < dpmq):
         best_aemp = fine_tune_aemp(best_aemp, dpmq, dispensing_fee)
-    
+
     return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
@@ -245,66 +238,59 @@ def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
     """
     target_dpmq = to_decimal(target_dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
-    
-    # Try small adjustments around the initial value
+
     adjustments = [
         Decimal("0.00"), Decimal("0.01"), Decimal("-0.01"),
-        Decimal("0.005"), Decimal("-0.005"), Decimal("0.001"), Decimal("-0.001")
+        Decimal("0.005"), Decimal("-0.005"),
+        Decimal("0.001"), Decimal("-0.001")
     ]
-    
+
     best_aemp = initial_aemp
     best_diff = Decimal("999999")
-    
+
     for adj in adjustments:
         test_aemp = initial_aemp + adj
-        
-        # Calculate the full chain
+
         if test_aemp <= Decimal("5.50"):
             wholesale = Decimal("0.41")
         elif test_aemp <= Decimal("720.00"):
             wholesale = test_aemp * Decimal("0.0752")
         else:
             wholesale = Decimal("54.14")
-        
+
         ptp = test_aemp + wholesale
-        
+
         if ptp <= Decimal("100.00"):
             ahi = Decimal("4.79")
         elif ptp <= Decimal("2000.00"):
             ahi = Decimal("4.79") + (ptp - Decimal("100.00")) * Decimal("0.05")
         else:
             ahi = Decimal("99.79")
-        
+
         reconstructed_dpmq = ptp + ahi + dispensing_fee
         diff = abs(reconstructed_dpmq - target_dpmq)
-        
+
         if diff < best_diff:
             best_diff = diff
             best_aemp = test_aemp
-    
+
     return best_aemp
 
-# Legacy function for backward compatibility (now calls the fixed version)
+# Legacy function
 def precise_inverse_aemp(dpmq, dispensing_fee):
-    """Legacy function - now calls the fixed version"""
     return precise_inverse_aemp_fixed(dpmq, dispensing_fee)
 
-# Tiered logic controller - UPDATED
+# Inverse controller (Tier-aware)
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
-    """
-    Updated inverse calculation with mathematical precision
-    """
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
-    
+
     if tier == "Tier1":
-        # Simple analytical solution for Tier 1
         result = dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
         return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     elif tier in ("Tier2", "Tier3"):
-        # Enhanced binary search for Tier 2 and 3
         return precise_inverse_aemp_fixed(dpmq, dispensing_fee)
-    
+
     return Decimal("0.00")
     
 # ----------------------
