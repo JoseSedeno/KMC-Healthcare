@@ -146,7 +146,7 @@ def precise_inverse_aemp(dpmq, dispensing_fee):
 
     low = Decimal("0.01")
     high = Decimal("1000000.00")  # ✅ supports pills up to $1M
-    tolerance = Decimal("0.005")
+    tolerance = Decimal("0.00005")  # 🔧 Tighter tolerance for cent-perfect DPMQ
 
     best_aemp = None
     closest_diff = None
@@ -183,9 +183,9 @@ def precise_inverse_aemp(dpmq, dispensing_fee):
             break
 
         if reconstructed_dpmq < dpmq:
-            low = mid + Decimal("0.0001")
+            low = mid + Decimal("0.00001")  # 🔧 finer step for high precision
         else:
-            high = mid - Decimal("0.0001")
+            high = mid - Decimal("0.00001")
 
     return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
