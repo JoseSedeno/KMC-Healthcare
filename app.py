@@ -13,7 +13,7 @@ import os
 os.system("pip install xlsxwriter")
 
 # Set decimal precision for PBS calculations
-getcontext().prec = 10
+getcontext().prec = 12
 
 # Configure Streamlit layout and metadata
 st.set_page_config(
