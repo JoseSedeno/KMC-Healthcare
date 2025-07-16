@@ -152,18 +152,11 @@ def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
     return to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + dispensing_fee + dangerous_fee
 
 # ----------------------
-# 🔹 INVERSE CALCULATOR – PRECISION AEMP LOGIC
-# ----------------------
-
-from decimal import Decimal, ROUND_HALF_UP, getcontext
-getcontext().prec = 28
-
-# ----------------------
 # 🔹 INVERSE TIER LOGIC
 # ----------------------
 
 def get_wholesale_tier(dpmq):
-    dpmq = Decimal(str(dpmq))
+    dpmq = to_decimal(dpmq)
     if dpmq <= Decimal("19.37"):
         return "Tier1"
     elif dpmq <= Decimal("821.31"):
@@ -175,58 +168,105 @@ def get_inverse_tier_type(dpmq):
     return get_wholesale_tier(dpmq)
 
 # ----------------------
-# 🔹 INVERSE AEMP CALCULATION
+# 🔹 INVERSE CALCULATOR – PRECISION AEMP LOGIC
 # ----------------------
 
-def to_decimal(value):
-    """Convert any numeric value to Decimal with proper precision"""
-    return Decimal(str(value))
-
-def precise_inverse_aemp_fixed(dpmq, dispensing_fee, include_dangerous=False):
+def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
+    """
+    Mathematically precise inverse AEMP calculation using binary search + fine-tuning
+    """
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
-    dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
-    adjusted_dpmq = dpmq - dangerous_fee
 
-    if adjusted_dpmq <= Decimal("19.37"):
-        # Tier 1: Direct subtraction
-        aemp = adjusted_dpmq - Decimal("0.41") - Decimal("4.79") - dispensing_fee
-        return aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if dpmq <= Decimal("19.37"):
+        result = dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
+        return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    elif adjusted_dpmq <= Decimal("821.31"):
-        # Tier 2: Rounding-aware search
-        k = adjusted_dpmq - Decimal("4.79") - dispensing_fee
-        x_approx = k / Decimal("1.0752")
+    def calculate_reconstructed_dpmq(aemp):
+        if aemp <= Decimal("5.50"):
+            wholesale = Decimal("0.41")
+        elif aemp <= Decimal("720.00"):
+            wholesale = aemp * Decimal("0.0752")
+        else:
+            wholesale = Decimal("54.14")
 
-        best_aemp = x_approx
-        best_diff = Decimal("999999")
-        step = Decimal("0.0001")
-        range_steps = 1000
+        ptp = aemp + wholesale
+        if ptp <= Decimal("100.00"):
+            ahi = Decimal("4.79")
+        elif ptp <= Decimal("2000.00"):
+            ahi = Decimal("4.79") + (ptp - Decimal("100.00")) * Decimal("0.05")
+        else:
+            ahi = Decimal("99.79")
 
-        for i in range(-range_steps, range_steps + 1):
-            test_aemp = x_approx + (Decimal(i) * step)
-            w = (test_aemp * Decimal("0.0752")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            ptp = test_aemp + w
-            ahi = Decimal("4.79") if ptp <= Decimal("100.00") else Decimal("4.79") + ((ptp - Decimal("100.00")) * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            reconstructed_dpmq = ptp + ahi + dispensing_fee + dangerous_fee
-            diff = abs(reconstructed_dpmq - dpmq)
+        return ptp + ahi + dispensing_fee
 
-            if diff < best_diff:
-                best_diff = diff
-                best_aemp = test_aemp
+    low = Decimal("0.01")
+    high = Decimal("1000000.00")
+    tolerance = Decimal("0.0001")
+    max_iterations = 1000
 
-            if diff == 0:
-                break
+    best_aemp = Decimal("0.00")
+    best_diff = Decimal("999999")
 
-        return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    for _ in range(max_iterations):
+        mid = (low + high) / 2
+        reconstructed_dpmq = calculate_reconstructed_dpmq(mid)
+        diff = abs(reconstructed_dpmq - dpmq)
 
-    else:
-        # Tier 3: Direct formula
-        aemp = adjusted_dpmq - Decimal("54.14") - Decimal("99.79") - dispensing_fee
-        return aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if diff < best_diff:
+            best_diff = diff
+            best_aemp = mid
+
+        if diff <= tolerance:
+            break
+
+        if reconstructed_dpmq < dpmq:
+            low = mid + Decimal("0.000001")
+        else:
+            high = mid - Decimal("0.000001")
+
+    best_aemp = fine_tune_aemp(best_aemp, dpmq, dispensing_fee)
+    return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
+    target_dpmq = to_decimal(target_dpmq)
+    dispensing_fee = to_decimal(dispensing_fee)
+
+    def calculate_reconstructed_dpmq(aemp):
+        if aemp <= Decimal("5.50"):
+            wholesale = Decimal("0.41")
+        elif aemp <= Decimal("720.00"):
+            wholesale = aemp * Decimal("0.0752")
+        else:
+            wholesale = Decimal("54.14")
+
+        ptp = aemp + wholesale
+        if ptp <= Decimal("100.00"):
+            ahi = Decimal("4.79")
+        elif ptp <= Decimal("2000.00"):
+            ahi = Decimal("4.79") + (ptp - Decimal("100.00")) * Decimal("0.05")
+        else:
+            ahi = Decimal("99.79")
+
+        return ptp + ahi + dispensing_fee
+
+    best_aemp = initial_aemp
+    best_diff = abs(calculate_reconstructed_dpmq(initial_aemp) - target_dpmq)
+    step = Decimal("0.001")
+
+    for i in range(-200, 201):
+        test_aemp = initial_aemp + (Decimal(i) * step)
+        reconstructed_dpmq = calculate_reconstructed_dpmq(test_aemp)
+        diff = abs(reconstructed_dpmq - target_dpmq)
+
+        if diff < best_diff:
+            best_diff = diff
+            best_aemp = test_aemp
+
+    return best_aemp
 
 # Inverse controller (Tier-aware)
-def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier, include_dangerous=False):
+def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
 
@@ -234,10 +274,9 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier, include_dangerous=Fal
         result = dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
         return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     elif tier in ("Tier2", "Tier3"):
-        return precise_inverse_aemp_fixed(dpmq, dispensing_fee, include_dangerous)
+        return precise_inverse_aemp_fixed(dpmq, dispensing_fee)
 
     return Decimal("0.00")
-
 
     
 # ----------------------
@@ -459,6 +498,3 @@ with right_col:
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
-
-
