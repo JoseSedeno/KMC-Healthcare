@@ -157,24 +157,20 @@ def get_inverse_tier_type(dpmq):
 # ----------------------
 # 🔹 INVERSE CALCULATOR – PRECISION AEMP LOGIC
 # ----------------------
-
 def precise_inverse_aemp(dpmq, dispensing_fee):
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
-
     low = Decimal("0.001")
     high = Decimal("1000000.000")
-    tolerance = Decimal("0.000001")  # Tighter tolerance for maximum precision
+    tolerance = Decimal("0.0000001")  # Much tighter tolerance
     
     best_aemp = None
     closest_diff = None
-    max_iterations = 200  # Increased iterations for higher precision
+    max_iterations = 1000  # More iterations for exact precision
     iteration = 0
-
     while low <= high and iteration < max_iterations:
         iteration += 1
         mid = (low + high) / Decimal("2")
-
         # Wholesale markup calculation with full Decimal precision
         if mid <= Decimal("5.50"):
             wholesale = Decimal("0.41")
@@ -182,9 +178,7 @@ def precise_inverse_aemp(dpmq, dispensing_fee):
             wholesale = mid * Decimal("0.0752")
         else:
             wholesale = Decimal("54.14")
-
         ptp = mid + wholesale
-
         # AHI Fee calculation with Decimal precision
         if ptp <= Decimal("100.00"):
             ahi = Decimal("4.79")
@@ -192,36 +186,30 @@ def precise_inverse_aemp(dpmq, dispensing_fee):
             ahi = Decimal("4.79") + (ptp - Decimal("100.00")) * Decimal("0.05")
         else:
             ahi = Decimal("99.79")
-
         reconstructed_dpmq = ptp + ahi + dispensing_fee
         diff = abs(reconstructed_dpmq - dpmq)
-
         if closest_diff is None or diff < closest_diff:
             closest_diff = diff
             best_aemp = mid
-
         if diff <= tolerance:
             break
-
         if reconstructed_dpmq < dpmq:
-            low = mid + Decimal("0.000001")
+            low = mid + Decimal("0.0000001")
         else:
-            high = mid - Decimal("0.000001")
-
+            high = mid - Decimal("0.0000001")
     return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 # Tiered logic controller
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
-
     if tier == "Tier1":
         result = dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
         return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     elif tier in ("Tier2", "Tier3"):
         return precise_inverse_aemp(dpmq, dispensing_fee)
     return Decimal("0.00")
-
+    
 # ----------------------
 # 🔹 HELPER CALCULATIONS
 # ----------------------
