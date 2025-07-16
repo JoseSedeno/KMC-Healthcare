@@ -89,10 +89,28 @@ with left_col:
     </div>
     """, unsafe_allow_html=True)
 
-
 # 4. 📦 SECTION 85 – CALCULATION FUNCTIONS
 
 from decimal import Decimal, ROUND_HALF_UP
+
+# Set higher precision for financial calculations
+getcontext().prec = 28
+
+# ----------------------
+# 🔹 PRECISION HELPERS
+# ----------------------
+
+def to_decimal(value):
+    """Convert any numeric value to Decimal with proper precision"""
+    return Decimal(str(value))
+
+def validate_calculation_precision(original_dpmq, reconstructed_dpmq, tolerance=Decimal("0.01")):
+    """Validate that inverse calculation is accurate"""
+    diff = abs(to_decimal(original_dpmq) - to_decimal(reconstructed_dpmq))
+    if diff > tolerance:
+        st.warning(f"⚠️ Precision warning: Difference of ${diff:.4f} detected")
+        return False
+    return True
 
 # ----------------------
 # 🔹 FORWARD LOGIC
@@ -102,15 +120,15 @@ from decimal import Decimal, ROUND_HALF_UP
 def calculate_aemp_max_qty(input_price, pricing_qty, max_qty):
     if pricing_qty == 0:
         return Decimal("0.00")
-    return (Decimal(input_price) * Decimal(max_qty)) / Decimal(pricing_qty)
+    return (to_decimal(input_price) * to_decimal(max_qty)) / to_decimal(pricing_qty)
 
 # Forward: AHI Fee – FORWARD PBS LOGIC
 def calculate_ahi_fee(price_to_pharmacist):
-    price_to_pharmacist = Decimal(price_to_pharmacist)
-    if price_to_pharmacist < Decimal("100"):
+    price_to_pharmacist = to_decimal(price_to_pharmacist)
+    if price_to_pharmacist < Decimal("100.00"):
         return Decimal("4.79")
-    elif price_to_pharmacist <= Decimal("2000"):
-        return Decimal("4.79") + Decimal("0.05") * (price_to_pharmacist - Decimal("100"))
+    elif price_to_pharmacist <= Decimal("2000.00"):
+        return Decimal("4.79") + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
     else:
         return Decimal("99.79")
 
@@ -118,14 +136,14 @@ def calculate_ahi_fee(price_to_pharmacist):
 def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
     dispensing_fee = Decimal("8.67")
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
-    return Decimal(price_to_pharmacist) + Decimal(ahi_fee) + dispensing_fee + dangerous_fee
+    return to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + dispensing_fee + dangerous_fee
 
 # ----------------------
 # 🔹 INVERSE TIER LOGIC
 # ----------------------
 
 def get_wholesale_tier(dpmq):
-    dpmq = Decimal(dpmq)
+    dpmq = to_decimal(dpmq)
     if dpmq <= Decimal("19.37"):
         return "Tier1"
     elif dpmq <= Decimal("821.31"):
@@ -141,20 +159,23 @@ def get_inverse_tier_type(dpmq):
 # ----------------------
 
 def precise_inverse_aemp(dpmq, dispensing_fee):
-    dpmq = Decimal(dpmq)
-    dispensing_fee = Decimal(dispensing_fee)
+    dpmq = to_decimal(dpmq)
+    dispensing_fee = to_decimal(dispensing_fee)
 
-    low = Decimal("0.01")
-    high = Decimal("1000000.00")  # ✅ supports pills up to $1M
-    tolerance = Decimal("0.00005")  # 🔧 Tighter tolerance for cent-perfect DPMQ
-
+    low = Decimal("0.001")
+    high = Decimal("1000000.000")
+    tolerance = Decimal("0.000001")  # Tighter tolerance for maximum precision
+    
     best_aemp = None
     closest_diff = None
+    max_iterations = 200  # Increased iterations for higher precision
+    iteration = 0
 
-    while low <= high:
-        mid = (low + high) / 2
+    while low <= high and iteration < max_iterations:
+        iteration += 1
+        mid = (low + high) / Decimal("2")
 
-        # Wholesale markup
+        # Wholesale markup calculation with full Decimal precision
         if mid <= Decimal("5.50"):
             wholesale = Decimal("0.41")
         elif mid <= Decimal("720.00"):
@@ -164,7 +185,7 @@ def precise_inverse_aemp(dpmq, dispensing_fee):
 
         ptp = mid + wholesale
 
-        # AHI Fee
+        # AHI Fee calculation with Decimal precision
         if ptp <= Decimal("100.00"):
             ahi = Decimal("4.79")
         elif ptp <= Decimal("2000.00"):
@@ -183,22 +204,23 @@ def precise_inverse_aemp(dpmq, dispensing_fee):
             break
 
         if reconstructed_dpmq < dpmq:
-            low = mid + Decimal("0.00001")  # 🔧 finer step for high precision
+            low = mid + Decimal("0.000001")
         else:
-            high = mid - Decimal("0.00001")
+            high = mid - Decimal("0.000001")
 
     return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 # Tiered logic controller
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
-    dpmq = Decimal(dpmq)
-    dispensing_fee = Decimal(dispensing_fee)
+    dpmq = to_decimal(dpmq)
+    dispensing_fee = to_decimal(dispensing_fee)
 
     if tier == "Tier1":
-        return dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
+        result = dpmq - dispensing_fee - Decimal("4.79") - Decimal("0.41")
+        return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     elif tier in ("Tier2", "Tier3"):
         return precise_inverse_aemp(dpmq, dispensing_fee)
-    return Decimal("0.00")  # fallback
+    return Decimal("0.00")
 
 # ----------------------
 # 🔹 HELPER CALCULATIONS
@@ -208,66 +230,83 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
 def calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty):
     if max_qty == 0:
         return Decimal("0.00")
-    return (Decimal(aemp_max_qty) * Decimal(pricing_qty)) / Decimal(max_qty)
+    result = (to_decimal(aemp_max_qty) * to_decimal(pricing_qty)) / to_decimal(max_qty)
+    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-# Inverse: Wholesale markup from AEMP
-def calculate_inverse_wholesale_markup(aemp_max_qty):
-    aemp_max_qty = Decimal(aemp_max_qty)
+# Forward: Wholesale markup from AEMP
+def calculate_wholesale_markup(aemp_max_qty):
+    aemp_max_qty = to_decimal(aemp_max_qty)
     if aemp_max_qty <= Decimal("5.50"):
         return Decimal("0.41")
     elif aemp_max_qty <= Decimal("720.00"):
-        return aemp_max_qty * Decimal("0.0752")
+        return (aemp_max_qty * Decimal("0.0752")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        return Decimal("54.14")
+
+# Inverse: Wholesale markup from AEMP
+def calculate_inverse_wholesale_markup(aemp_max_qty):
+    aemp_max_qty = to_decimal(aemp_max_qty)
+    if aemp_max_qty <= Decimal("5.50"):
+        return Decimal("0.41")
+    elif aemp_max_qty <= Decimal("720.00"):
+        return (aemp_max_qty * Decimal("0.0752")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     else:
         return Decimal("54.14")
 
 # AEMP + markup = PTP
 def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
-    return Decimal(aemp_max_qty) + Decimal(wholesale_markup)
+    result = to_decimal(aemp_max_qty) + to_decimal(wholesale_markup)
+    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 # Inverse: AHI Fee – based on PtP
 def calculate_inverse_ahi_fee(price_to_pharmacist):
-    price_to_pharmacist = Decimal(price_to_pharmacist)
+    price_to_pharmacist = to_decimal(price_to_pharmacist)
     if price_to_pharmacist <= Decimal("100.00"):
         return Decimal("4.79")
     elif price_to_pharmacist <= Decimal("2000.00"):
-        return Decimal("4.79") + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
+        result = Decimal("4.79") + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
+        return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     else:
         return Decimal("99.79")
 
 # Final DPMQ – used in inverse check
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
-    return Decimal(price_to_pharmacist) + Decimal(ahi_fee) + Decimal(dispensing_fee) + dangerous_fee
+    result = to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + to_decimal(dispensing_fee) + dangerous_fee
+    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 # ----------------------
 # 🔹 COST BREAKDOWN (Visuals & Exports)
 # ----------------------
+
+def format_currency(amount):
+    """Format Decimal as currency with consistent precision"""
+    return f"${to_decimal(amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
 
 def generate_cost_breakdown_df(
     aemp_max_qty, unit_aemp, wholesale_markup,
     price_to_pharmacist, ahi_fee, dispensing_fee,
     dangerous_fee, final_price, label="AEMP"
 ):
-    data = [["AEMP for max quantity", f"${Decimal(aemp_max_qty):.2f}"]]
+    data = [["AEMP for max quantity", format_currency(aemp_max_qty)]]
 
     if unit_aemp is not None:
-        data.append(["Unit AEMP", f"${Decimal(unit_aemp):.2f}"])
+        data.append(["Unit AEMP", format_currency(unit_aemp)])
 
     data.extend([
-        ["Wholesale markup", f"${Decimal(wholesale_markup):.2f}"],
-        ["Price to pharmacist", f"${Decimal(price_to_pharmacist):.2f}"],
-        ["AHI fee", f"${Decimal(ahi_fee):.2f}"],
-        ["Dispensing fee", f"${Decimal(dispensing_fee):.2f}"]
+        ["Wholesale markup", format_currency(wholesale_markup)],
+        ["Price to pharmacist", format_currency(price_to_pharmacist)],
+        ["AHI fee", format_currency(ahi_fee)],
+        ["Dispensing fee", format_currency(dispensing_fee)]
     ])
 
-    if Decimal(dangerous_fee) > 0:
-        data.append(["Dangerous drug fee", f"${Decimal(dangerous_fee):.2f}"])
+    if to_decimal(dangerous_fee) > 0:
+        data.append(["Dangerous drug fee", format_currency(dangerous_fee)])
 
     label_row = "DPMQ" if label == "DPMQ" else "Final Price"
-    data.append([label_row, f"${Decimal(final_price):.2f}"])
+    data.append([label_row, format_currency(final_price)])
 
     return pd.DataFrame(data, columns=["Component", "Amount"])
-
 
 def display_cost_breakdown(
     aemp_max_qty, unit_aemp, wholesale_markup,
@@ -275,16 +314,26 @@ def display_cost_breakdown(
     dangerous_fee, final_price, label="AEMP"
 ):
     st.markdown(f"### 💰 COST BREAKDOWN ({label})")
-    st.write(f"**AEMP for max quantity:** ${Decimal(aemp_max_qty):.2f}")
+    st.write(f"**AEMP for max quantity:** {format_currency(aemp_max_qty)}")
     if unit_aemp is not None:
-        st.write(f"**Unit AEMP:** ${Decimal(unit_aemp):.2f}")
-    st.write(f"**Wholesale markup:** ${Decimal(wholesale_markup):.2f}")
-    st.write(f"**Price to pharmacist:** ${Decimal(price_to_pharmacist):.2f}")
-    st.write(f"**AHI fee:** ${Decimal(ahi_fee):.2f}")
-    st.write(f"**Dispensing fee:** ${Decimal(dispensing_fee):.2f}")
-    if Decimal(dangerous_fee) > 0:
-        st.write(f"**Dangerous drug fee:** ${Decimal(dangerous_fee):.2f}")
-    st.markdown(f"### 💊 {'Reconstructed DPMQ' if label == 'DPMQ' else 'DPMQ'}: **${Decimal(final_price):.2f}**")
+        st.write(f"**Unit AEMP:** {format_currency(unit_aemp)}")
+    st.write(f"**Wholesale markup:** {format_currency(wholesale_markup)}")
+    st.write(f"**Price to pharmacist:** {format_currency(price_to_pharmacist)}")
+    st.write(f"**AHI fee:** {format_currency(ahi_fee)}")
+    st.write(f"**Dispensing fee:** {format_currency(dispensing_fee)}")
+    if to_decimal(dangerous_fee) > 0:
+        st.write(f"**Dangerous drug fee:** {format_currency(dangerous_fee)}")
+    st.markdown(f"### 💊 {'Reconstructed DPMQ' if label == 'DPMQ' else 'DPMQ'}: **{format_currency(final_price)}**")
+
+    # Add precision validation display
+    if label == "DPMQ":
+        # Validate that our inverse calculation is accurate
+        original_dpmq = st.session_state.get('original_input_price', final_price)
+        if validate_calculation_precision(original_dpmq, final_price):
+            st.success("✅ Calculation precision validated")
+        else:
+            st.error("❌ Precision warning: Significant rounding detected")
+
 
 
 # 5. 📤 SECTION 85 – OUTPUT BREAKDOWN
