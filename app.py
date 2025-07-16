@@ -276,10 +276,6 @@ def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
 
     return best_aemp
 
-# Legacy function
-def precise_inverse_aemp(dpmq, dispensing_fee):
-    return precise_inverse_aemp_fixed(dpmq, dispensing_fee)
-
 # Inverse controller (Tier-aware)
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
     dpmq = to_decimal(dpmq)
