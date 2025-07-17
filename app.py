@@ -202,7 +202,7 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
 
     low = Decimal("0.01")
     high = Decimal("1000000.00")
-    tolerance = Decimal("0.00001")  # ✅ tighter tolerance for high-precision match
+    tolerance = Decimal("0.00001")
     max_iterations = 1000
 
     best_aemp = Decimal("0.00")
@@ -228,7 +228,7 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
             break
 
     best_aemp = fine_tune_aemp(best_aemp, dpmq, dispensing_fee)
-    return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return best_aemp  # delay rounding to final DPMQ
 
 def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
     target_dpmq = to_decimal(target_dpmq)
@@ -254,8 +254,8 @@ def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
 
     best_aemp = initial_aemp
     best_diff = abs(calculate_reconstructed_dpmq(initial_aemp) - target_dpmq)
-    step = Decimal("0.00001")  # ✅ ultra-fine step
-    range_limit = 20000        # ✅ ±$0.20 sweep with 0.00001 granularity
+    step = Decimal("0.000005")  # Ultra-fine step
+    range_limit = 40000         # ±$0.20 sweep with finer resolution
 
     for i in range(-range_limit, range_limit + 1):
         test_aemp = initial_aemp + (Decimal(i) * step)
@@ -267,6 +267,7 @@ def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
             best_aemp = test_aemp
 
     return best_aemp
+
 
 # Inverse controller (Tier-aware)
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
@@ -393,7 +394,6 @@ def display_cost_breakdown(
             st.success(message)
         else:
             st.error(message)
-
 
 
 # 5. 📤 SECTION 85 – OUTPUT BREAKDOWN
