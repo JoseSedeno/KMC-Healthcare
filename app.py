@@ -464,20 +464,20 @@ def display_cost_breakdown(
 
 from config import PBS_CONSTANTS
 
-# Only use right_col (left_col is already defined in Section 3)
-right_col = st.columns(2)[1]
+# ⛔ DO NOT redefine right_col here — already defined in Section 3
+# ✅ Use the existing right_col
 
 with right_col:
-    # ------------------------------
+    # ------------------------------ 
     # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
-    # ------------------------------
+    # ------------------------------ 
     if price_type == "DPMQ":
         st.session_state['original_input_price'] = input_price
 
         dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
         tier = get_inverse_tier_type(input_price)
 
-        # ✅ FIX: Adjust input DPMQ to subtract dangerous fee only if toggle is on
+        # Adjust input DPMQ to subtract dangerous fee if toggle is on
         effective_dpmq = Decimal(input_price) - DANGEROUS_FEE if include_dangerous_fee else Decimal(input_price)
 
         # Inverse: DPMQ → AEMP
@@ -517,9 +517,9 @@ with right_col:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-    # ------------------------------
+    # ------------------------------ 
     # 🔄 FORWARD CALCULATOR (AEMP → DPMQ)
-    # ------------------------------
+    # ------------------------------ 
     elif price_type == "AEMP":
         dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
 
@@ -554,7 +554,6 @@ with right_col:
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
 
 # ----------------------
 # 🔹 COST BREAKDOWN (Visuals & Exports)
