@@ -71,14 +71,19 @@ with left_col:
         st.error("❌ DPMQ too low to cover PBS fees.")
         st.stop()
 
-    # ------------------------------
-    # 🔹 Quantities
-    # ------------------------------
-    col1, col2 = st.columns(2)
-    with col1:
-        pricing_qty = st.number_input("Pricing quantity:", min_value=1, step=1, format="%d")
-    with col2:
-        max_qty = st.number_input("Maximum quantity:", min_value=1, step=1, format="%d")
+# ------------------------------
+# 🔹 Quantities
+# ------------------------------
+col1, col2 = st.columns(2)
+with col1:
+    pricing_qty = st.number_input("Pricing quantity:", min_value=1, step=1, format="%d")
+with col2:
+    max_qty = st.number_input("Maximum quantity:", min_value=1, step=1, format="%d")
+
+# 🔒 Defensive check (Step 1 – v15)
+if pricing_qty == 0 or max_qty == 0:
+    st.error("❌ Pricing quantity and maximum quantity must be greater than zero.")
+    st.stop()
 
     # ------------------------------
     # 🔹 Dispensing Type
