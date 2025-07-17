@@ -186,7 +186,7 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
         if aemp <= Decimal("5.50"):
             wholesale = Decimal("0.41")
         elif aemp <= Decimal("720.00"):
-            wholesale = aemp * Decimal("0.0752")
+            wholesale = aemp * Decimal("0.0752")  # full precision
         else:
             wholesale = Decimal("54.14")
 
@@ -222,8 +222,10 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
 
         if reconstructed_dpmq < dpmq:
             low = mid + Decimal("0.000001")
-        else:
+        elif reconstructed_dpmq > dpmq:
             high = mid - Decimal("0.000001")
+        else:
+            break
 
     best_aemp = fine_tune_aemp(best_aemp, dpmq, dispensing_fee)
     return best_aemp.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -236,7 +238,7 @@ def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
         if aemp <= Decimal("5.50"):
             wholesale = Decimal("0.41")
         elif aemp <= Decimal("720.00"):
-            wholesale = aemp * Decimal("0.0752")
+            wholesale = aemp * Decimal("0.0752")  # full precision
         else:
             wholesale = Decimal("54.14")
 
