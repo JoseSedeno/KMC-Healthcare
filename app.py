@@ -485,10 +485,6 @@ with right_col:
 
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
-        st.markdown("### 🧦 COST BREAKDOWN (Inverse)")
-        st.write(f"**Tier used:** {tier}")
-        st.write(f"**AEMP for max quantity:** ${aemp_max_qty:.2f}")
-
         display_cost_breakdown(
             aemp_max_qty, unit_aemp, wholesale_markup,
             price_to_pharmacist, ahi_fee, dispensing_fee,
