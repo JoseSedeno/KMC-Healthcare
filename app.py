@@ -283,7 +283,6 @@ def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
 
     return Decimal("0.00")
 
-    
 # ----------------------
 # 🔹 HELPER CALCULATIONS
 # ----------------------
@@ -311,31 +310,31 @@ def calculate_inverse_wholesale_markup(aemp_max_qty):
     if aemp_max_qty <= Decimal("5.50"):
         return Decimal("0.41")
     elif aemp_max_qty <= Decimal("720.00"):
-        return aemp_max_qty * Decimal("0.0752")  # full precision, no rounding yet
+        return aemp_max_qty * Decimal("0.0752")  # full precision, no rounding
     else:
         return Decimal("54.14")
 
-# AEMP + markup = PTP
+# AEMP + markup = PTP (delayed rounding)
 def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
     result = to_decimal(aemp_max_qty) + to_decimal(wholesale_markup)
-    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return result  # Delay quantization until final DPMQ
 
-# Inverse: AHI Fee – based on PtP
+# Inverse: AHI Fee – based on PtP (delayed rounding)
 def calculate_inverse_ahi_fee(price_to_pharmacist):
     price_to_pharmacist = to_decimal(price_to_pharmacist)
-    if price_to_pharmacist <= Decimal("100.00"):
+    if price_to_pharmacist < Decimal("100.00"):
         return Decimal("4.79")
     elif price_to_pharmacist <= Decimal("2000.00"):
         result = Decimal("4.79") + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
-        return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return result  # Delay quantization
     else:
         return Decimal("99.79")
 
-# Final DPMQ – used in inverse check
+# Final DPMQ – used in inverse check (final rounding)
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
     dangerous_fee = Decimal("4.46") if include_dangerous else Decimal("0.00")
     result = to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + to_decimal(dispensing_fee) + dangerous_fee
-    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)    
 
 # ----------------------
 # 🔹 COST BREAKDOWN (Visuals & Exports)
