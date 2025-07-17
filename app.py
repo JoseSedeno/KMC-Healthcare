@@ -425,17 +425,21 @@ with right_col:
     if price_type == "DPMQ":
         st.session_state['original_input_price'] = input_price  # ✅ Step 2 Fix
 
-        dispensing_fee = Decimal("8.67")
+        dispensing_fee = DISPENSING_FEE
         tier = get_inverse_tier_type(input_price)
 
+        # ✅ FIX: Adjust input DPMQ to subtract dangerous fee only if toggle is on
+        effective_dpmq = Decimal(input_price) - DANGEROUS_FEE if include_dangerous_fee else Decimal(input_price)
+
         # Inverse: DPMQ → AEMP
-        aemp_max_qty = calculate_inverse_aemp_max(input_price, dispensing_fee, tier)
+        aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
         unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
         wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
-        dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
+        dangerous_fee = DANGEROUS_FEE if include_dangerous_fee else Decimal("0.00")
 
+        # Reconstruct full DPMQ for display and validation
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
         st.markdown("### 🧮 COST BREAKDOWN (Inverse)")
@@ -470,14 +474,14 @@ with right_col:
     # 🔄 FORWARD CALCULATOR (AEMP → DPMQ)
     # ------------------------------
     elif price_type == "AEMP":
-        dispensing_fee = Decimal("8.67")
+        dispensing_fee = DISPENSING_FEE
 
         # Forward: AEMP → DPMQ
         aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
         wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
-        dangerous_fee = Decimal("4.46") if include_dangerous_fee else Decimal("0.00")
+        dangerous_fee = DANGEROUS_FEE if include_dangerous_fee else Decimal("0.00")
 
         dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
 
