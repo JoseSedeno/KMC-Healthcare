@@ -40,7 +40,6 @@ SECTION_OPTIONS = ["Section 85"]
 # Pricing logic options
 PRICE_TYPE_OPTIONS = ["AEMP", "DPMQ"]
 
-
 # 3. 📥 SECTION 85 – INPUT SECTION (LEFT SIDE)
 
 left_col, right_col = st.columns([1, 1.2])
@@ -71,19 +70,16 @@ with left_col:
         st.error("❌ DPMQ too low to cover PBS fees.")
         st.stop()
 
-# ------------------------------
-# 🔹 Quantities
-# ------------------------------
-col1, col2 = st.columns(2)
-with col1:
+    # ------------------------------
+    # 🔹 Quantities (stacked vertically)
+    # ------------------------------
     pricing_qty = st.number_input("Pricing quantity:", min_value=1, step=1, format="%d")
-with col2:
     max_qty = st.number_input("Maximum quantity:", min_value=1, step=1, format="%d")
 
-# 🔒 Defensive check (Step 1 – v15)
-if pricing_qty == 0 or max_qty == 0:
-    st.error("❌ Pricing quantity and maximum quantity must be greater than zero.")
-    st.stop()
+    # 🔒 Defensive check (Step 1 – v15)
+    if pricing_qty == 0 or max_qty == 0:
+        st.error("❌ Pricing quantity and maximum quantity must be greater than zero.")
+        st.stop()
 
     # ------------------------------
     # 🔹 Dispensing Type
@@ -106,7 +102,6 @@ if pricing_qty == 0 or max_qty == 0:
         Co-developed by: <strong>KMC Healthcare</strong>
     </div>
     """, unsafe_allow_html=True)
-
 
 # 4. 📦 SECTION 85 – CALCULATION FUNCTIONS
 
