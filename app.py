@@ -469,55 +469,56 @@ with right_col:
 # ------------------------------
 # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
 # ------------------------------
-if price_type == "DPMQ":
-    st.session_state['original_input_price'] = input_price  # TODO: Replace with direct parameter (v15 refactor)
+with right_col:
+    if price_type == "DPMQ":
+        st.session_state['original_input_price'] = input_price  # TODO: Replace with direct parameter (v15 refactor)
 
-    dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
-    tier = get_inverse_tier_type(input_price)
+        dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
+        tier = get_inverse_tier_type(input_price)
 
-    # ✅ FIX: Adjust input DPMQ to subtract dangerous fee only if toggle is on
-    effective_dpmq = Decimal(input_price) - DANGEROUS_FEE if include_dangerous_fee else Decimal(input_price)
+        # ✅ FIX: Adjust input DPMQ to subtract dangerous fee only if toggle is on
+        effective_dpmq = Decimal(input_price) - DANGEROUS_FEE if include_dangerous_fee else Decimal(input_price)
 
-    # Inverse: DPMQ → AEMP
-    aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
-    unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
-    
-    # ✅ FIXED: Call with only one argument
-    wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
+        # Inverse: DPMQ → AEMP
+        aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
+        unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
 
-    price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
-    ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
-    dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
+        # ✅ FIXED: Call with only one argument
+        wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
 
-    # Reconstruct full DPMQ for display and validation
-    dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
+        price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
+        ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
+        dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
 
-    st.markdown("### 🧦 COST BREAKDOWN (Inverse)")
-    st.write(f"**Tier used:** {tier}")
-    st.write(f"**AEMP for max quantity:** ${aemp_max_qty:.2f}")
+        # Reconstruct full DPMQ for display and validation
+        dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
-    display_cost_breakdown(
-        aemp_max_qty, unit_aemp, wholesale_markup,
-        price_to_pharmacist, ahi_fee, dispensing_fee,
-        dangerous_fee, dpmq, label="DPMQ"
-    )
+        st.markdown("### 🧦 COST BREAKDOWN (Inverse)")
+        st.write(f"**Tier used:** {tier}")
+        st.write(f"**AEMP for max quantity:** ${aemp_max_qty:.2f}")
 
-    # Export – Inverse
-    df = generate_cost_breakdown_df(
-        aemp_max_qty, unit_aemp, wholesale_markup,
-        price_to_pharmacist, ahi_fee, dispensing_fee,
-        dangerous_fee, dpmq, label="DPMQ"
-    )
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+        display_cost_breakdown(
+            aemp_max_qty, unit_aemp, wholesale_markup,
+            price_to_pharmacist, ahi_fee, dispensing_fee,
+            dangerous_fee, dpmq, label="DPMQ"
+        )
 
-    st.download_button(
-        label="📅 Download DPMQ Breakdown as Excel",
-        data=buffer.getvalue(),
-        file_name="dpmpq_breakdown.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+        # Export – Inverse
+        df = generate_cost_breakdown_df(
+            aemp_max_qty, unit_aemp, wholesale_markup,
+            price_to_pharmacist, ahi_fee, dispensing_fee,
+            dangerous_fee, dpmq, label="DPMQ"
+        )
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+
+        st.download_button(
+            label="📅 Download DPMQ Breakdown as Excel",
+            data=buffer.getvalue(),
+            file_name="dpmpq_breakdown.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     # ------------------------------
     # 🔄 FORWARD CALCULATOR (AEMP → DPMQ)
