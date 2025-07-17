@@ -464,14 +464,18 @@ def display_cost_breakdown(
 
 from config import PBS_CONSTANTS
 
-with right_col:
+left_col, right_col = st.columns(2)
 
-# ------------------------------
-# 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
-# ------------------------------
+with left_col:
+    st.number_input("Pricing quantity:", min_value=1, value=pricing_qty, key="pricing_qty")
+    st.number_input("Maximum quantity:", min_value=1, value=max_qty, key="max_qty")
+
 with right_col:
+    # ------------------------------
+    # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
+    # ------------------------------
     if price_type == "DPMQ":
-        st.session_state['original_input_price'] = input_price  # TODO: Replace with direct parameter (v15 refactor)
+        st.session_state['original_input_price'] = input_price
 
         dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
         tier = get_inverse_tier_type(input_price)
@@ -482,15 +486,11 @@ with right_col:
         # Inverse: DPMQ → AEMP
         aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
         unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
-
-        # ✅ FIXED: Call with only one argument
         wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
-
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
         dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
 
-        # Reconstruct full DPMQ for display and validation
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
         st.markdown("### 🧦 COST BREAKDOWN (Inverse)")
@@ -557,7 +557,6 @@ with right_col:
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
 
 # ----------------------
 # 🔹 COST BREAKDOWN (Visuals & Exports)
