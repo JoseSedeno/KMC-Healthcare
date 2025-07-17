@@ -467,8 +467,7 @@ from config import PBS_CONSTANTS
 left_col, right_col = st.columns(2)
 
 with left_col:
-    st.number_input("Pricing quantity:", min_value=1, value=pricing_qty, key="pricing_qty")
-    st.number_input("Maximum quantity:", min_value=1, value=max_qty, key="max_qty")
+    pass  # inputs already declared earlier — no duplicates here
 
 with right_col:
     # ------------------------------
