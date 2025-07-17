@@ -157,19 +157,20 @@ def calculate_aemp_max_qty(input_price, pricing_qty, max_qty):
 # Forward: AHI Fee – FORWARD PBS LOGIC
 def calculate_ahi_fee(price_to_pharmacist):
     price_to_pharmacist = to_decimal(price_to_pharmacist)
+    ahi_base = PBS_CONSTANTS["AHI_BASE"]
+
     if price_to_pharmacist < Decimal("100.00"):
-        return AHI_BASE
+        return ahi_base
     elif price_to_pharmacist <= Decimal("2000.00"):
-        return AHI_BASE + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
+        return ahi_base + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
     else:
         return Decimal("99.79")
 
 # Forward: DPMQ = PtP + AHI + Dispensing + [Dangerous]
 def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
-    dispensing_fee = DISPENSING_FEE
-    dangerous_fee = DANGEROUS_FEE if include_dangerous else Decimal("0.00")
+    dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
+    dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous else Decimal("0.00")
     return to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + dispensing_fee + dangerous_fee
-
 
 # ----------------------
 # 🔹 INVERSE TIER LOGIC
@@ -177,9 +178,12 @@ def calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous=False):
 
 def get_wholesale_tier(dpmq):
     dpmq = to_decimal(dpmq)
-    if dpmq <= Decimal("19.37"):
+    tier1_cap = PBS_CONSTANTS["WHOLESALE_TIER_THRESHOLDS"]["TIER1"]
+    tier2_cap = PBS_CONSTANTS["WHOLESALE_TIER_THRESHOLDS"]["TIER2"]
+
+    if dpmq <= tier1_cap:
         return "Tier1"
-    elif dpmq <= Decimal("821.31"):
+    elif dpmq <= tier2_cap:
         return "Tier2"
     else:
         return "Tier3"
@@ -197,26 +201,33 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
     """
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
+    ahi_base = PBS_CONSTANTS["AHI_BASE"]
+    tier1_cap = PBS_CONSTANTS["WHOLESALE_TIER_THRESHOLDS"]["TIER1"]
+    wholesale_fixed = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
+    aemp_threshold = PBS_CONSTANTS["WHOLESALE_AEMP_THRESHOLD"]
+    markup_rate = PBS_CONSTANTS["WHOLESALE_MARKUP_RATE"]
+    flat_fee = PBS_CONSTANTS["WHOLESALE_FLAT_FEE"]
 
-    if dpmq <= Decimal("19.37"):
-        result = dpmq - dispensing_fee - AHI_BASE - Decimal("0.41")
+    if dpmq <= tier1_cap:
+        result = dpmq - dispensing_fee - ahi_base - wholesale_fixed
         return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def calculate_reconstructed_dpmq(aemp):
-        if aemp <= Decimal("5.50"):
-            wholesale = Decimal("0.41")
-        elif aemp <= Decimal("720.00"):
-            wholesale = aemp * WHOLESALE_MARKUP_RATE
+        if aemp <= aemp_threshold:
+            wholesale = wholesale_fixed
+        elif aemp <= PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]:
+            wholesale = aemp * markup_rate
         else:
-            wholesale = WHOLESALE_FLAT_FEE
+            wholesale = flat_fee
 
         ptp = aemp + wholesale
-        if ptp <= Decimal("100.00"):
-            ahi = AHI_BASE
-        elif ptp <= Decimal("2000.00"):
-            ahi = AHI_BASE + (ptp - Decimal("100.00")) * Decimal("0.05")
+
+        if ptp <= PBS_CONSTANTS["AHI_TIER1_CAP"]:
+            ahi = ahi_base
+        elif ptp <= PBS_CONSTANTS["AHI_TIER2_CAP"]:
+            ahi = ahi_base + (ptp - PBS_CONSTANTS["AHI_TIER1_CAP"]) * Decimal("0.05")
         else:
-            ahi = Decimal("99.79")
+            ahi = PBS_CONSTANTS["AHI_MAX_FEE"]
 
         return ptp + ahi + dispensing_fee
 
@@ -254,22 +265,28 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
 def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
     target_dpmq = to_decimal(target_dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
+    ahi_base = PBS_CONSTANTS["AHI_BASE"]
+    aemp_threshold = PBS_CONSTANTS["WHOLESALE_AEMP_THRESHOLD"]
+    flat_fee = PBS_CONSTANTS["WHOLESALE_FLAT_FEE"]
+    markup_rate = PBS_CONSTANTS["WHOLESALE_MARKUP_RATE"]
+    wholesale_fixed = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
 
     def calculate_reconstructed_dpmq(aemp):
-        if aemp <= Decimal("5.50"):
-            wholesale = Decimal("0.41")
-        elif aemp <= Decimal("720.00"):
-            wholesale = aemp * WHOLESALE_MARKUP_RATE
+        if aemp <= aemp_threshold:
+            wholesale = wholesale_fixed
+        elif aemp <= PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]:
+            wholesale = aemp * markup_rate
         else:
-            wholesale = WHOLESALE_FLAT_FEE
+            wholesale = flat_fee
 
         ptp = aemp + wholesale
-        if ptp <= Decimal("100.00"):
-            ahi = AHI_BASE
-        elif ptp <= Decimal("2000.00"):
-            ahi = AHI_BASE + (ptp - Decimal("100.00")) * Decimal("0.05")
+
+        if ptp <= PBS_CONSTANTS["AHI_TIER1_CAP"]:
+            ahi = ahi_base
+        elif ptp <= PBS_CONSTANTS["AHI_TIER2_CAP"]:
+            ahi = ahi_base + (ptp - PBS_CONSTANTS["AHI_TIER1_CAP"]) * Decimal("0.05")
         else:
-            ahi = Decimal("99.79")
+            ahi = PBS_CONSTANTS["AHI_MAX_FEE"]
 
         return ptp + ahi + dispensing_fee
 
@@ -289,14 +306,16 @@ def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
 
     return best_aemp
 
-
 # Inverse controller (Tier-aware)
 def calculate_inverse_aemp_max(dpmq, dispensing_fee, tier):
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
+    ahi_base = PBS_CONSTANTS["AHI_BASE"]
+    wholesale_fixed = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
+    tier1_cap = PBS_CONSTANTS["WHOLESALE_TIER_THRESHOLDS"]["TIER1"]
 
     if tier == "Tier1":
-        result = dpmq - dispensing_fee - AHI_BASE - Decimal("0.41")
+        result = dpmq - dispensing_fee - ahi_base - wholesale_fixed
         return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     elif tier in ("Tier2", "Tier3"):
         return precise_inverse_aemp_fixed(dpmq, dispensing_fee)
@@ -317,22 +336,34 @@ def calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty):
 # Forward: Wholesale markup from AEMP
 def calculate_wholesale_markup(aemp_max_qty):
     aemp_max_qty = to_decimal(aemp_max_qty)
-    if aemp_max_qty <= Decimal("5.50"):
-        return Decimal("0.41")
-    elif aemp_max_qty <= Decimal("720.00"):
-        return (aemp_max_qty * WHOLESALE_MARKUP_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    threshold = PBS_CONSTANTS["WHOLESALE_AEMP_THRESHOLD"]
+    fixed_fee = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
+    tier2_cap = PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]
+    markup_rate = PBS_CONSTANTS["WHOLESALE_MARKUP_RATE"]
+    flat_fee = PBS_CONSTANTS["WHOLESALE_FLAT_FEE"]
+
+    if aemp_max_qty <= threshold:
+        return fixed_fee
+    elif aemp_max_qty <= tier2_cap:
+        return (aemp_max_qty * markup_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     else:
-        return WHOLESALE_FLAT_FEE
+        return flat_fee
 
 # Inverse: Wholesale markup from AEMP (delayed rounding)
 def calculate_inverse_wholesale_markup(aemp_max_qty):
     aemp_max_qty = to_decimal(aemp_max_qty)
-    if aemp_max_qty <= Decimal("5.50"):
-        return Decimal("0.41")
-    elif aemp_max_qty <= Decimal("720.00"):
-        return aemp_max_qty * WHOLESALE_MARKUP_RATE  # full precision, no rounding
+    threshold = PBS_CONSTANTS["WHOLESALE_AEMP_THRESHOLD"]
+    fixed_fee = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
+    tier2_cap = PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]
+    markup_rate = PBS_CONSTANTS["WHOLESALE_MARKUP_RATE"]
+    flat_fee = PBS_CONSTANTS["WHOLESALE_FLAT_FEE"]
+
+    if aemp_max_qty <= threshold:
+        return fixed_fee
+    elif aemp_max_qty <= tier2_cap:
+        return aemp_max_qty * markup_rate  # full precision, no rounding
     else:
-        return WHOLESALE_FLAT_FEE
+        return flat_fee
 
 # AEMP + markup = PTP (delayed rounding)
 def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
@@ -342,19 +373,24 @@ def calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup):
 # Inverse: AHI Fee – based on PtP (delayed rounding)
 def calculate_inverse_ahi_fee(price_to_pharmacist):
     price_to_pharmacist = to_decimal(price_to_pharmacist)
-    if price_to_pharmacist < Decimal("100.00"):
-        return AHI_BASE
-    elif price_to_pharmacist <= Decimal("2000.00"):
-        result = AHI_BASE + (price_to_pharmacist - Decimal("100.00")) * Decimal("0.05")
+    ahi_base = PBS_CONSTANTS["AHI_BASE"]
+    tier1_cap = PBS_CONSTANTS["AHI_TIER1_CAP"]
+    tier2_cap = PBS_CONSTANTS["AHI_TIER2_CAP"]
+    max_fee = PBS_CONSTANTS["AHI_MAX_FEE"]
+
+    if price_to_pharmacist < tier1_cap:
+        return ahi_base
+    elif price_to_pharmacist <= tier2_cap:
+        result = ahi_base + (price_to_pharmacist - tier1_cap) * Decimal("0.05")
         return result  # Delay quantization
     else:
-        return Decimal("99.79")
+        return max_fee
 
 # Final DPMQ – used in inverse check (final rounding)
 def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include_dangerous=False):
-    dangerous_fee = DANGEROUS_FEE if include_dangerous else Decimal("0.00")
+    dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous else Decimal("0.00")
     result = to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + to_decimal(dispensing_fee) + dangerous_fee
-    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) 
+    return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 # ----------------------
 # 🔹 COST BREAKDOWN (Visuals & Exports)
@@ -416,11 +452,13 @@ def display_cost_breakdown(
         else:
             st.error(message)
 
-# 5. 📤 SECTION 85 – OUTPUT BREAKDOWN
+# 5. 📄 SECTION 85 – OUTPUT BREAKDOWN  ✅ CONFIG CONSTANTS MIGRATED (DISPENSING_FEE, WHOLESALE_FIXED_FEE_TIER1, DANGEROUS_FEE)
 
 # ----------------------------------------
 # 🔹 SECTION 85 – RIGHT PANEL OUTPUT LOGIC
 # ----------------------------------------
+
+from config import PBS_CONSTANTS
 
 with right_col:
 
@@ -428,9 +466,9 @@ with right_col:
     # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
     # ------------------------------
     if price_type == "DPMQ":
-        st.session_state['original_input_price'] = input_price  # ✅ Step 2 Fix
+        st.session_state['original_input_price'] = input_price  # TODO: Replace with direct parameter (v15 refactor)
 
-        dispensing_fee = DISPENSING_FEE
+        dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
         tier = get_inverse_tier_type(input_price)
 
         # ✅ FIX: Adjust input DPMQ to subtract dangerous fee only if toggle is on
@@ -439,15 +477,15 @@ with right_col:
         # Inverse: DPMQ → AEMP
         aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
         unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
-        wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
+        wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty, PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"])
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
-        dangerous_fee = DANGEROUS_FEE if include_dangerous_fee else Decimal("0.00")
+        dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
 
         # Reconstruct full DPMQ for display and validation
         dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
-        st.markdown("### 🧮 COST BREAKDOWN (Inverse)")
+        st.markdown("### 🧦 COST BREAKDOWN (Inverse)")
         st.write(f"**Tier used:** {tier}")
         st.write(f"**AEMP for max quantity:** ${aemp_max_qty:.2f}")
 
@@ -468,25 +506,24 @@ with right_col:
             df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
         st.download_button(
-            label="📥 Download DPMQ Breakdown as Excel",
+            label="📅 Download DPMQ Breakdown as Excel",
             data=buffer.getvalue(),
             file_name="dpmpq_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-
     # ------------------------------
     # 🔄 FORWARD CALCULATOR (AEMP → DPMQ)
     # ------------------------------
     elif price_type == "AEMP":
-        dispensing_fee = DISPENSING_FEE
+        dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
 
         # Forward: AEMP → DPMQ
         aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
         wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
         price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
         ahi_fee = calculate_ahi_fee(price_to_pharmacist)
-        dangerous_fee = DANGEROUS_FEE if include_dangerous_fee else Decimal("0.00")
+        dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
 
         dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
 
@@ -507,9 +544,72 @@ with right_col:
             df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
         st.download_button(
-            label="📥 Download AEMP Breakdown as Excel",
+            label="📅 Download AEMP Breakdown as Excel",
             data=buffer.getvalue(),
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+
+# ----------------------
+# 🔹 COST BREAKDOWN (Visuals & Exports)
+# ----------------------
+
+def format_currency(amount):
+    """Format Decimal as currency with consistent precision"""
+    return f"${to_decimal(amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
+
+def generate_cost_breakdown_df(
+    aemp_max_qty, unit_aemp, wholesale_markup,
+    price_to_pharmacist, ahi_fee, dispensing_fee,
+    dangerous_fee, final_price, label="AEMP"
+):
+    data = [["AEMP for max quantity", format_currency(aemp_max_qty)]]
+
+    if unit_aemp is not None:
+        data.append(["Unit AEMP", format_currency(unit_aemp)])
+
+    data.extend([
+        ["Wholesale markup", format_currency(wholesale_markup)],
+        ["Price to pharmacist", format_currency(price_to_pharmacist)],
+        ["AHI fee", format_currency(ahi_fee)],
+        ["Dispensing fee", format_currency(dispensing_fee)]
+    ])
+
+    if to_decimal(dangerous_fee) > 0:
+        data.append(["Dangerous drug fee", format_currency(dangerous_fee)])
+
+    label_row = "DPMQ" if label == "DPMQ" else "Final Price"
+    data.append([label_row, format_currency(final_price)])
+
+    return pd.DataFrame(data, columns=["Component", "Amount"])
+
+def display_cost_breakdown(
+    aemp_max_qty, unit_aemp, wholesale_markup,
+    price_to_pharmacist, ahi_fee, dispensing_fee,
+    dangerous_fee, final_price, label="AEMP"
+):
+    st.markdown(f"### 💰 COST BREAKDOWN ({label})")
+    st.write(f"**AEMP for max quantity:** {format_currency(aemp_max_qty)}")
+    if unit_aemp is not None:
+        st.write(f"**Unit AEMP:** {format_currency(unit_aemp)}")
+    st.write(f"**Wholesale markup:** {format_currency(wholesale_markup)}")
+    st.write(f"**Price to pharmacist:** {format_currency(price_to_pharmacist)}")
+    st.write(f"**AHI fee:** {format_currency(ahi_fee)}")
+    st.write(f"**Dispensing fee:** {format_currency(dispensing_fee)}")
+    if to_decimal(dangerous_fee) > 0:
+        st.write(f"**Dangerous drug fee:** {format_currency(dangerous_fee)}")
+    st.markdown(f"### 💊 {'Reconstructed DPMQ' if label == 'DPMQ' else 'DPMQ'}: **{format_currency(final_price)}**")
+
+    # Add enhanced precision validation display
+    if label == "DPMQ":
+        # Validate that our inverse calculation is accurate
+        original_dpmq = st.session_state.get('original_input_price', final_price)  # TODO: Accept as argument instead
+        is_valid, message = validate_calculation_precision_enhanced(original_dpmq, final_price)
+        if is_valid:
+            st.success(message)
+        else:
+            st.error(message)
+
+
 
