@@ -300,13 +300,13 @@ def calculate_wholesale_markup(aemp_max_qty):
     else:
         return Decimal("54.14")
 
-# Inverse: Wholesale markup from AEMP
+# Inverse: Wholesale markup from AEMP (delayed rounding)
 def calculate_inverse_wholesale_markup(aemp_max_qty):
     aemp_max_qty = to_decimal(aemp_max_qty)
     if aemp_max_qty <= Decimal("5.50"):
         return Decimal("0.41")
     elif aemp_max_qty <= Decimal("720.00"):
-        return (aemp_max_qty * Decimal("0.0752")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return aemp_max_qty * Decimal("0.0752")  # full precision, no rounding yet
     else:
         return Decimal("54.14")
 
