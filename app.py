@@ -201,12 +201,14 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
     """
     dpmq = to_decimal(dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
+
     ahi_base = PBS_CONSTANTS["AHI_BASE"]
     tier1_cap = PBS_CONSTANTS["WHOLESALE_TIER_THRESHOLDS"]["TIER1"]
     wholesale_fixed = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
     aemp_threshold = PBS_CONSTANTS["WHOLESALE_AEMP_THRESHOLD"]
     markup_rate = PBS_CONSTANTS["WHOLESALE_MARKUP_RATE"]
     flat_fee = PBS_CONSTANTS["WHOLESALE_FLAT_FEE"]
+    tier2_cap = PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]
 
     if dpmq <= tier1_cap:
         result = dpmq - dispensing_fee - ahi_base - wholesale_fixed
@@ -215,7 +217,7 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
     def calculate_reconstructed_dpmq(aemp):
         if aemp <= aemp_threshold:
             wholesale = wholesale_fixed
-        elif aemp <= PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]:
+        elif aemp <= tier2_cap:
             wholesale = aemp * markup_rate
         else:
             wholesale = flat_fee
@@ -265,16 +267,18 @@ def precise_inverse_aemp_fixed(dpmq, dispensing_fee):
 def fine_tune_aemp(initial_aemp, target_dpmq, dispensing_fee):
     target_dpmq = to_decimal(target_dpmq)
     dispensing_fee = to_decimal(dispensing_fee)
+
     ahi_base = PBS_CONSTANTS["AHI_BASE"]
     aemp_threshold = PBS_CONSTANTS["WHOLESALE_AEMP_THRESHOLD"]
     flat_fee = PBS_CONSTANTS["WHOLESALE_FLAT_FEE"]
     markup_rate = PBS_CONSTANTS["WHOLESALE_MARKUP_RATE"]
     wholesale_fixed = PBS_CONSTANTS["WHOLESALE_FIXED_FEE_TIER1"]
+    tier2_cap = PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]
 
     def calculate_reconstructed_dpmq(aemp):
         if aemp <= aemp_threshold:
             wholesale = wholesale_fixed
-        elif aemp <= PBS_CONSTANTS["WHOLESALE_TIER2_CAP"]:
+        elif aemp <= tier2_cap:
             wholesale = aemp * markup_rate
         else:
             wholesale = flat_fee
