@@ -30,7 +30,7 @@ from decimal import Decimal
 # Pricing constants (easy to update in future)
 DISPENSING_FEE = Decimal("8.67")
 AHI_BASE = Decimal("4.79")
-DANGEROUS_FEE = Decimal("4.46")
+DANGEROUS_FEE = Decimal("5.37")
 WHOLESALE_MARKUP_RATE = Decimal("0.0752")
 WHOLESALE_FLAT_FEE = Decimal("54.14")
 
