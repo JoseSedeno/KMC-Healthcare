@@ -395,22 +395,7 @@ def display_cost_breakdown(
         else:
             st.error(message)
 
-
 # 5. 📤 SECTION 85 – OUTPUT BREAKDOWN
-
-# ----------------------------------------
-# 🔹 Forward Wholesale Markup (AEMP to PtP)
-# ----------------------------------------
-
-def calculate_wholesale_markup(aemp_max_qty):
-    aemp_max_qty = Decimal(aemp_max_qty)
-    if aemp_max_qty <= Decimal("5.50"):
-        return Decimal("0.41")
-    elif aemp_max_qty <= Decimal("720.00"):
-        return aemp_max_qty * Decimal("0.0752")
-    else:
-        return Decimal("54.14")
-
 
 # ----------------------------------------
 # 🔹 SECTION 85 – RIGHT PANEL OUTPUT LOGIC
@@ -422,6 +407,8 @@ with right_col:
     # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
     # ------------------------------
     if price_type == "DPMQ":
+        st.session_state['original_input_price'] = input_price  # ✅ Step 2 Fix
+
         dispensing_fee = Decimal("8.67")
         tier = get_inverse_tier_type(input_price)
 
@@ -500,3 +487,4 @@ with right_col:
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
