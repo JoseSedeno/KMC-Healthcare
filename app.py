@@ -509,7 +509,7 @@ from config import PBS_CONSTANTS
 
 with right_col:
 
-    # ------------------------------
+# ------------------------------
 # 🔹 SECTION 100 – EFC OUTPUT (Forward: AEMP → DPMQ)
 # ------------------------------
 if selected_section == "Section 100 – EFC" and price_type == "AEMP":
