@@ -69,9 +69,6 @@ with left_col:
         vial_content = st.number_input("Vial content (mg):", min_value=1.0, step=1.0, format="%.1f")
         max_amount = st.number_input("Maximum amount (mg):", min_value=1.0, step=1.0, format="%.1f")
 
-        # ⛔ TEMPORARY: Prevents Section 85 logic from executing
-        st.stop()
-
     # ------------------------------
     # 🔹 SECTION 85 INPUTS (Default)
     # ------------------------------
