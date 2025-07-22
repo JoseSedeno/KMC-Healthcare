@@ -35,12 +35,14 @@ WHOLESALE_MARKUP_RATE = Decimal("0.0752")
 WHOLESALE_FLAT_FEE = Decimal("54.14")
 
 # Currently implemented section
-SECTION_OPTIONS = ["Section 85"]
+SECTION_OPTIONS = ["Section 85", "Section 100 – EFC"]
 
 # Pricing logic options
 PRICE_TYPE_OPTIONS = ["AEMP", "DPMQ"]
 
+# ===============================
 # 3. 📥 SECTION 85 – INPUT SECTION (LEFT SIDE)
+# ===============================
 
 left_col, right_col = st.columns([1, 1.2])
 
@@ -53,59 +55,102 @@ with left_col:
 
     selected_section = st.selectbox("Section", SECTION_OPTIONS)
 
-    price_type = st.radio("Price type:", PRICE_TYPE_OPTIONS, horizontal=True)
-    price_label = "AEMP price:" if price_type == "AEMP" else "DPMQ price:"
-    input_price = st.number_input(price_label, min_value=0.0, step=0.01, format="%.2f")
+    # ------------------------------
+    # 🔹 SECTION 100 – EFC INPUTS
+    # ------------------------------
+    if selected_section == "Section 100 – EFC":
+        price_type = st.radio("Price type:", PRICE_TYPE_OPTIONS, horizontal=True)
+        price_label = "AEMP price:" if price_type == "AEMP" else "DPMQ price:"
+        input_price = st.number_input(price_label, min_value=0.0, step=0.01, format="%.2f")
 
-    # ------------------------------
-    # 🔹 Additional Options (moved here for correct order)
-    # ------------------------------
-    include_dangerous_fee = st.toggle("Include dangerous drug fee?")
+        consider_wastage = st.toggle("Consider drug wastage?")
 
-    # ------------------------------
-    # 🔹 Input Validations
-    # ------------------------------
-    MIN_DPMQ = DISPENSING_FEE + AHI_BASE + (DANGEROUS_FEE if include_dangerous_fee else Decimal("0.00"))
-    if price_type == "DPMQ" and Decimal(input_price) < MIN_DPMQ:
-        st.error("❌ DPMQ too low to cover PBS fees.")
+        pricing_qty = st.number_input("Pricing quantity:", min_value=1, step=1, format="%d")
+        vial_content = st.number_input("Vial content (mg):", min_value=1.0, step=1.0, format="%.1f")
+        max_amount = st.number_input("Maximum amount (mg):", min_value=1.0, step=1.0, format="%.1f")
+
+        # ⛔ TEMPORARY: Prevents Section 85 logic from executing
         st.stop()
 
     # ------------------------------
-    # 🔹 Quantities (stacked vertically)
+    # 🔹 SECTION 85 INPUTS (Default)
     # ------------------------------
-    pricing_qty = st.number_input("Pricing quantity:", min_value=1, step=1, format="%d")
-    max_qty = st.number_input("Maximum quantity:", min_value=1, step=1, format="%d")
+    else:
+        price_type = st.radio("Price type:", PRICE_TYPE_OPTIONS, horizontal=True)
+        price_label = "AEMP price:" if price_type == "AEMP" else "DPMQ price:"
+        input_price = st.number_input(price_label, min_value=0.0, step=0.01, format="%.2f")
 
-    # 🔒 Defensive check (Step 1 – v15)
-    if pricing_qty == 0 or max_qty == 0:
-        st.error("❌ Pricing quantity and maximum quantity must be greater than zero.")
-        st.stop()
+        # ------------------------------
+        # 🔹 Additional Options (moved here for correct order)
+        # ------------------------------
+        include_dangerous_fee = st.toggle("Include dangerous drug fee?")
 
-    # ------------------------------
-    # 🔹 Dispensing Type
-    # ------------------------------
-    DISPENSING_OPTIONS = ["Ready-prepared"]
-    dispensing_type = st.selectbox("Dispensing type:", DISPENSING_OPTIONS)
+        # ------------------------------
+        # 🔹 Input Validations
+        # ------------------------------
+        MIN_DPMQ = DISPENSING_FEE + AHI_BASE + (DANGEROUS_FEE if include_dangerous_fee else Decimal("0.00"))
+        if price_type == "DPMQ" and Decimal(input_price) < MIN_DPMQ:
+            st.error("❌ DPMQ too low to cover PBS fees.")
+            st.stop()
 
-    # ------------------------------
-    # 🔹 Footer Notes
-    # ------------------------------
-    st.markdown("""
-    <div style='font-size: 12px; color: grey; margin-top: 20px;'>
-        There might be slight discrepancy in the estimated DPMQ values from the calculator and published DPMQ prices due to rounding of values.  
-        Last updated: 1 July 2024
-    </div>
-    """, unsafe_allow_html=True)
+        # ------------------------------
+        # 🔹 Quantities (stacked vertically)
+        # ------------------------------
+        pricing_qty = st.number_input("Pricing quantity:", min_value=1, step=1, format="%d")
+        max_qty = st.number_input("Maximum quantity:", min_value=1, step=1, format="%d")
 
-    st.markdown("""
-    <div style='margin-top: 20px; font-size: 12px; color: grey;'>
-        Co-developed by: <strong>KMC Healthcare</strong>
-    </div>
-    """, unsafe_allow_html=True)
+        # 🔒 Defensive check (Step 1 – v15)
+        if pricing_qty == 0 or max_qty == 0:
+            st.error("❌ Pricing quantity and maximum quantity must be greater than zero.")
+            st.stop()
+
+        # ------------------------------
+        # 🔹 Dispensing Type
+        # ------------------------------
+        DISPENSING_OPTIONS = ["Ready-prepared"]
+        dispensing_type = st.selectbox("Dispensing type:", DISPENSING_OPTIONS)
+
+        # ------------------------------
+        # 🔹 Footer Notes
+        # ------------------------------
+        st.markdown("""
+        <div style='font-size: 12px; color: grey; margin-top: 20px;'>
+            There might be slight discrepancy in the estimated DPMQ values from the calculator and published DPMQ prices due to rounding of values.  
+            Last updated: 1 July 2024
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div style='margin-top: 20px; font-size: 12px; color: grey;'>
+            Co-developed by: <strong>KMC Healthcare</strong>
+        </div>
+        """, unsafe_allow_html=True)
 
 # 4. 📦 SECTION 85 – CALCULATION FUNCTIONS
 
-from decimal import Decimal, ROUND_HALF_UP
+# ------------------------------
+# 🔹 SECTION 100 – EFC FORWARD HELPERS
+# ------------------------------
+
+from math import ceil
+
+def calculate_vials_needed(max_amount, vial_content, consider_wastage):
+    if consider_wastage:
+        return Decimal(ceil(Decimal(max_amount) / Decimal(vial_content)))
+    else:
+        return Decimal(max_amount) / Decimal(vial_content)
+
+def calculate_aemp_max(ex_manufacturer_price, vials_needed, pricing_qty):
+    total_cost = Decimal(ex_manufacturer_price) * vials_needed
+    return total_cost / Decimal(pricing_qty)
+
+def calculate_ahi_fee_efc(setting):
+    if setting == "Public":
+        return Decimal("90.13")
+    elif setting == "Private":
+        return Decimal("134.8")
+    else:
+        return Decimal("0.00")
 
 # Set higher precision for financial calculations
 getcontext().prec = 28
@@ -463,6 +508,24 @@ from config import PBS_CONSTANTS
 # ✅ Use the existing right_col
 
 with right_col:
+
+        # ------------------------------
+    # 🔹 SECTION 100 – EFC OUTPUT (Forward: AEMP → DPMQ)
+    # ------------------------------
+    if selected_section == "Section 100 – EFC" and price_type == "AEMP":
+        vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+        aemp_max = calculate_aemp_max(input_price, vials_needed, pricing_qty)
+        ahi_fee = calculate_ahi_fee_efc("Public")  # Default to Public setting for now
+        dpmq = aemp_max + ahi_fee
+
+        st.markdown("### 💊 SECTION 100 – EFC: FORWARD RESULT")
+        st.write(f"**Vials needed:** {vials_needed}")
+        st.write(f"**AEMP for max amount:** ${aemp_max:.2f}")
+        st.write(f"**AHI fee:** ${ahi_fee:.2f}")
+        st.write(f"**Final DPMQ:** ${dpmq:.2f}")
+
+        st.stop()  # Prevents Section 85 output from running
+
     # ------------------------------ 
     # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
     # ------------------------------ 
