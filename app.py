@@ -622,7 +622,7 @@ with right_col:
             df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
         st.download_button(
-            label="📅 Download AEMP Breakdown as Excel",
+            label="📅 Download AEMP Breakdown in Excel",
             data=buffer.getvalue(),
             file_name="aemp_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
