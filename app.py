@@ -132,13 +132,16 @@ with left_col:
 from math import ceil
 
 def calculate_vials_needed(max_amount, vial_content, consider_wastage):
+    max_amount = Decimal(max_amount)
+    vial_content = Decimal(vial_content)
+
     if consider_wastage:
-        return Decimal(ceil(Decimal(max_amount) / Decimal(vial_content)))
+        return Decimal(ceil(max_amount / vial_content))
     else:
-        return Decimal(max_amount) / Decimal(vial_content)
+        return max_amount / vial_content  # allow decimal vials if no wastage considered
 
 def calculate_aemp_max(ex_manufacturer_price, vials_needed, pricing_qty):
-    total_cost = Decimal(ex_manufacturer_price) * vials_needed
+    total_cost = Decimal(ex_manufacturer_price) * Decimal(vials_needed)
     return total_cost / Decimal(pricing_qty)
 
 def calculate_ahi_fee_efc(setting):
@@ -506,22 +509,39 @@ from config import PBS_CONSTANTS
 
 with right_col:
 
-        # ------------------------------
-    # 🔹 SECTION 100 – EFC OUTPUT (Forward: AEMP → DPMQ)
-    # ------------------------------
-    if selected_section == "Section 100 – EFC" and price_type == "AEMP":
-        vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
-        aemp_max = calculate_aemp_max(input_price, vials_needed, pricing_qty)
-        ahi_fee = calculate_ahi_fee_efc("Public")  # Default to Public setting for now
-        dpmq = aemp_max + ahi_fee
+# ------------------------------
+# 🔹 SECTION 100 – EFC OUTPUT (Forward: AEMP → DPMQ)
+# ------------------------------
+if selected_section == "Section 100 – EFC" and price_type == "AEMP":
+    # Calculations
+    vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+    aemp_max = calculate_aemp_max(input_price, vials_needed, pricing_qty)
 
-        st.markdown("### 💊 SECTION 100 – EFC: FORWARD RESULT")
-        st.write(f"**Vials needed:** {vials_needed}")
-        st.write(f"**AEMP for max amount:** ${aemp_max:.2f}")
-        st.write(f"**AHI fee:** ${ahi_fee:.2f}")
-        st.write(f"**Final DPMQ:** ${dpmq:.2f}")
+    # AHI + markup for both settings
+    ahi_public = calculate_ahi_fee_efc("Public")
+    ahi_private = calculate_ahi_fee_efc("Private")
+    markup_public = Decimal("0.00")
+    markup_private = aemp_max * Decimal("0.007")
 
-        st.stop()  # Prevents Section 85 output from running
+    dpmq_public = aemp_max + markup_public + ahi_public
+    dpmq_private = aemp_max + markup_private + ahi_private
+
+    # Display breakdown
+    st.markdown("### 💊 SECTION 100 – EFC: FORWARD RESULT")
+    st.write(f"**AEMP for Max Amount:** ${aemp_max:.2f}")
+    st.write("---")
+    st.write("**Public Hospital:**")
+    st.write(f"• Wholesale Markup: ${markup_public:.2f}")
+    st.write(f"• AHI Fee: ${ahi_public:.2f}")
+    st.write(f"• Final DPMQ: ${dpmq_public:.2f}")
+    st.write("")
+    st.write("**Private Hospital:**")
+    st.write(f"• Wholesale Markup: ${markup_private:.2f}")
+    st.write(f"• AHI Fee: ${ahi_private:.2f}")
+    st.write(f"• Final DPMQ: ${dpmq_private:.2f}")
+
+    st.stop()
+
 
     # ------------------------------ 
     # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
