@@ -509,39 +509,38 @@ from config import PBS_CONSTANTS
 
 with right_col:
 
-# ------------------------------
-# 🔹 SECTION 100 – EFC OUTPUT (Forward: AEMP → DPMQ)
-# ------------------------------
-if selected_section == "Section 100 – EFC" and price_type == "AEMP":
-    # Calculations
-    vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
-    aemp_max = calculate_aemp_max(input_price, vials_needed, pricing_qty)
+    # ------------------------------
+    # 🔹 SECTION 100 – EFC OUTPUT (Forward: AEMP → DPMQ)
+    # ------------------------------
+    if selected_section == "Section 100 – EFC" and price_type == "AEMP":
+        # Calculations
+        vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+        aemp_max = calculate_aemp_max(input_price, vials_needed, pricing_qty)
 
-    # AHI + markup for both settings
-    ahi_public = calculate_ahi_fee_efc("Public")
-    ahi_private = calculate_ahi_fee_efc("Private")
-    markup_public = Decimal("0.00")
-    markup_private = aemp_max * Decimal("0.007")
+        # AHI + markup for both settings
+        ahi_public = calculate_ahi_fee_efc("Public")
+        ahi_private = calculate_ahi_fee_efc("Private")
+        markup_public = Decimal("0.00")
+        markup_private = aemp_max * Decimal("0.007")
 
-    dpmq_public = aemp_max + markup_public + ahi_public
-    dpmq_private = aemp_max + markup_private + ahi_private
+        dpmq_public = aemp_max + markup_public + ahi_public
+        dpmq_private = aemp_max + markup_private + ahi_private
 
-    # Display breakdown
-    st.markdown("### 💊 SECTION 100 – EFC: FORWARD RESULT")
-    st.write(f"**AEMP for Max Amount:** ${aemp_max:.2f}")
-    st.write("---")
-    st.write("**Public Hospital:**")
-    st.write(f"• Wholesale Markup: ${markup_public:.2f}")
-    st.write(f"• AHI Fee: ${ahi_public:.2f}")
-    st.write(f"• Final DPMQ: ${dpmq_public:.2f}")
-    st.write("")
-    st.write("**Private Hospital:**")
-    st.write(f"• Wholesale Markup: ${markup_private:.2f}")
-    st.write(f"• AHI Fee: ${ahi_private:.2f}")
-    st.write(f"• Final DPMQ: ${dpmq_private:.2f}")
+        # Display breakdown
+        st.markdown("### 💊 SECTION 100 – EFC: FORWARD RESULT")
+        st.write(f"**AEMP for Max Amount:** ${aemp_max:.2f}")
+        st.write("---")
+        st.write("**Public Hospital:**")
+        st.write(f"• Wholesale Markup: ${markup_public:.2f}")
+        st.write(f"• AHI Fee: ${ahi_public:.2f}")
+        st.write(f"• Final DPMQ: ${dpmq_public:.2f}")
+        st.write("")
+        st.write("**Private Hospital:**")
+        st.write(f"• Wholesale Markup: ${markup_private:.2f}")
+        st.write(f"• AHI Fee: ${ahi_private:.2f}")
+        st.write(f"• Final DPMQ: ${dpmq_private:.2f}")
 
-    st.stop()
-
+        st.stop()
 
     # ------------------------------ 
     # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
