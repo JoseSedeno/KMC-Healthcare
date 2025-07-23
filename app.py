@@ -542,13 +542,33 @@ with right_col:
         st.write(f"• Wholesale Markup: ${markup_private:.2f}")
         st.write(f"• AHI Fee: ${ahi_private:.2f}")
         st.write(f"• Final DPMQ: ${dpmq_private:.2f}")
+        st.stop()
 
+    # ------------------------------
+    # 🔁 SECTION 100 – EFC INVERSE (DPMQ → AEMP)
+    # ------------------------------
+    elif selected_section == "Section 100 – EFC" and price_type == "DPMQ":
+        # Assume private setting for now
+        dpmq_input = Decimal(input_price)
+        ahi_fee = calculate_ahi_fee_efc("Private")
+
+        # Step 1: Subtract AHI fee
+        pre_ahi = dpmq_input - ahi_fee
+
+        # Step 2: Reverse wholesale markup (divide by 1.014)
+        aemp_max = (pre_ahi / Decimal("1.014")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Output
+        st.markdown("### 🔁 SECTION 100 – EFC: INVERSE RESULT")
+        st.write(f"**Input DPMQ:** ${dpmq_input:.2f}")
+        st.write(f"**Reversed AHI Fee (Private):** ${ahi_fee:.2f}")
+        st.write(f"**Calculated AEMP:** ${aemp_max:.2f}")
         st.stop()
 
     # ------------------------------ 
-    # 🔁 INVERSE CALCULATOR (DPMQ → AEMP)
+    # 🔁 SECTION 85 – INVERSE CALCULATOR (DPMQ → AEMP)
     # ------------------------------ 
-    if price_type == "DPMQ":
+    elif selected_section == "Section 85" and price_type == "DPMQ":
         st.session_state['original_input_price'] = input_price
 
         dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
@@ -584,16 +604,16 @@ with right_col:
             df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
         st.download_button(
-            label="📅 Download DPMQ Breakdown as Excel",
+            label="📅 Download DPMQ Breakdown in Excel",
             data=buffer.getvalue(),
             file_name="dpmpq_breakdown.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     # ------------------------------ 
-    # 🔄 FORWARD CALCULATOR (AEMP → DPMQ)
+    # 🔄 SECTION 85 – FORWARD CALCULATOR (AEMP → DPMQ)
     # ------------------------------ 
-    elif price_type == "AEMP":
+    elif selected_section == "Section 85" and price_type == "AEMP":
         dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
 
         # Forward: AEMP → DPMQ
