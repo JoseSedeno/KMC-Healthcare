@@ -513,77 +513,77 @@ with right_col:
 # ------------------------------
 # 🔁 SECTION 100 – EFC INVERSE (DPMQ → AEMP)
 # ------------------------------
-
+    
     if selected_section == "Section 100 – EFC" and price_type == "DPMQ":
-    dpmq_input = Decimal(input_price)
+        dpmq_input = Decimal(input_price)
 
-    # AHI Fee (based on hospital setting)
-    ahi_fee = calculate_ahi_fee_efc(hospital_setting)
+        # AHI Fee (based on hospital setting)
+        ahi_fee = calculate_ahi_fee_efc(hospital_setting)
 
-    # Step 1: Remove AHI Fee
-    subtotal = dpmq_input - ahi_fee
+        # Step 1: Remove AHI Fee
+        subtotal = dpmq_input - ahi_fee
 
-    # Step 2: Wholesale Markup (only for private)
-    if hospital_setting == "Private":
-        # Reverse 1.014 multiplier: x + 0.014x = subtotal (keep full precision)
-        markup = (subtotal / Decimal("1.014")) * Decimal("0.014")
-    else:
-        markup = Decimal("0.00")
+        # Step 2: Wholesale Markup (only for private)
+        if hospital_setting == "Private":
+            # Reverse 1.014 multiplier: x + 0.014x = subtotal (keep full precision)
+            markup = (subtotal / Decimal("1.014")) * Decimal("0.014")
+        else:
+            markup = Decimal("0.00")
 
-    # Step 3: AEMP for Maximum Amount (total ex-manufacturer cost)
-    aemp_total = subtotal - markup  # still full precision
+        # Step 3: AEMP for Maximum Amount (total ex-manufacturer cost)
+        aemp_total = subtotal - markup  # still full precision
 
-    # Step 4: Divide by vials_needed to get unit cost, then re-multiply by pricing_qty
-    vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
-    if vials_needed == 0:
-        aemp_final = Decimal("0.00")
-    else:
-        aemp_final = (aemp_total / vials_needed) * Decimal(pricing_qty)
-        aemp_final = aemp_final.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # Step 4: Divide by vials_needed to get unit cost, then re-multiply by pricing_qty
+        vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+        if vials_needed == 0:
+            aemp_final = Decimal("0.00")
+        else:
+            aemp_final = (aemp_total / vials_needed) * Decimal(pricing_qty)
+            aemp_final = aemp_final.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # Step 5: Display Breakdown
-    st.markdown("### 🧮 SECTION 100 – EFC: CALCULATED AEMP")
-    st.write(f"**Hospital setting:** {hospital_setting}")
-    st.write(f"**Input DPMQ:** ${dpmq_input:.2f}")
-    st.write(f"**AHI Fee:** ${ahi_fee:.2f}")
-    st.write(f"**Wholesale Markup:** ${markup.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}")
-    st.write(f"**AEMP (Final):** ${aemp_final:.2f}")
+        # Step 5: Display Breakdown
+        st.markdown("### 🧮 SECTION 100 – EFC: CALCULATED AEMP")
+        st.write(f"**Hospital setting:** {hospital_setting}")
+        st.write(f"**Input DPMQ:** ${dpmq_input:.2f}")
+        st.write(f"**AHI Fee:** ${ahi_fee:.2f}")
+        st.write(f"**Wholesale Markup:** ${markup.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}")
+        st.write(f"**AEMP (Final):** ${aemp_final:.2f}")
 
-    # Step 6: Show cost breakdown
-    display_cost_breakdown(
-        aemp_max_qty=aemp_final,
-        unit_aemp=None,
-        wholesale_markup=markup,
-        price_to_pharmacist=aemp_total,
-        ahi_fee=ahi_fee,
-        dispensing_fee=Decimal("0.00"),
-        dangerous_fee=Decimal("0.00"),
-        final_price=dpmq_input,
-        label="DPMQ"
-    )
+        # Step 6: Show cost breakdown
+        display_cost_breakdown(
+            aemp_max_qty=aemp_final,
+            unit_aemp=None,
+            wholesale_markup=markup,
+            price_to_pharmacist=aemp_total,
+            ahi_fee=ahi_fee,
+            dispensing_fee=Decimal("0.00"),
+            dangerous_fee=Decimal("0.00"),
+            final_price=dpmq_input,
+            label="DPMQ"
+        )
 
-    # Step 7: Export to Excel
-    df = generate_cost_breakdown_df(
-        aemp_max_qty=aemp_final,
-        unit_aemp=None,
-        wholesale_markup=markup,
-        price_to_pharmacist=aemp_total,
-        ahi_fee=ahi_fee,
-        dispensing_fee=Decimal("0.00"),
-        dangerous_fee=Decimal("0.00"),
-        final_price=dpmq_input,
-        label="DPMQ"
-    )
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+        # Step 7: Export to Excel
+        df = generate_cost_breakdown_df(
+            aemp_max_qty=aemp_final,
+            unit_aemp=None,
+            wholesale_markup=markup,
+            price_to_pharmacist=aemp_total,
+            ahi_fee=ahi_fee,
+            dispensing_fee=Decimal("0.00"),
+            dangerous_fee=Decimal("0.00"),
+            final_price=dpmq_input,
+            label="DPMQ"
+        )
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
-    st.download_button(
-        label="📅 Download DPMQ Breakdown in Excel",
-        data=buffer.getvalue(),
-        file_name="section100_inverse_dpmq.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+        st.download_button(
+            label="📅 Download DPMQ Breakdown in Excel",
+            data=buffer.getvalue(),
+            file_name="section100_inverse_dpmq.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     # ------------------------------ 
     # 🔁 SECTION 85 – INVERSE CALCULATOR (DPMQ → AEMP)
