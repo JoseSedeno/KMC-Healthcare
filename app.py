@@ -513,7 +513,8 @@ with right_col:
 # ------------------------------
 # 🔁 SECTION 100 – EFC INVERSE (DPMQ → AEMP)
 # ------------------------------
-if selected_section == "Section 100 – EFC" and price_type == "DPMQ":
+
+    if selected_section == "Section 100 – EFC" and price_type == "DPMQ":
     dpmq_input = Decimal(input_price)
 
     # AHI Fee (based on hospital setting)
