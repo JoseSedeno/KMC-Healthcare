@@ -616,7 +616,7 @@ with right_col:
 # 📤 SECTION 100 – FORWARD PRICING (AEMP → DPMQ)
 # ------------------------------
 
-elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
+elif selected_section == "Section 100 - EFC" and price_type == "AEMP":
     run_section100_efc_forward(
         input_price=input_price,
         pricing_qty=pricing_qty,
@@ -629,7 +629,7 @@ elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
 # ------------------------------
 # 🔁 SECTION 100 – EFC INVERSE (DPMQ → AEMP)
 # ------------------------------
-elif selected_section == "Section 100 – EFC" and price_type == "DPMQ":
+elif selected_section == "Section 100 - EFC" and price_type == "DPMQ":
     run_section100_efc_inverse(
         input_price=input_price,
         pricing_qty=pricing_qty,
@@ -638,7 +638,6 @@ elif selected_section == "Section 100 – EFC" and price_type == "DPMQ":
         consider_wastage=consider_wastage,
         hospital_setting=hospital_setting
     )
-
     
     # ------------------------------ 
     # 🔄 SECTION 85 – FORWARD CALCULATOR (AEMP → DPMQ)
