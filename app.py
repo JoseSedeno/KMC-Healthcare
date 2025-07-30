@@ -615,7 +615,6 @@ with right_col:
 # ------------------------------
 # 📤 SECTION 100 – FORWARD PRICING (AEMP → DPMQ)
 # ------------------------------
-
 elif selected_section == "Section 100 - EFC" and price_type == "AEMP":
     run_section100_efc_forward(
         input_price=input_price,
