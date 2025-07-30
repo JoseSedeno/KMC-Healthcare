@@ -70,6 +70,7 @@ with left_col:
         vial_content = st.number_input("Vial content (mg):", min_value=1.0, step=1.0, format="%.1f")
         max_amount = st.number_input("Maximum amount (mg):", min_value=1.0, step=1.0, format="%.1f")
 
+    
     # ------------------------------
     # 🔹 SECTION 85 INPUTS (Default)
     # ------------------------------
@@ -555,68 +556,34 @@ with right_col:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-    # ------------------------------
-    # 📤 SECTION 100 – FORWARD PRICING (AEMP → DPMQ)
-    # ------------------------------
+# ------------------------------
+# 📤 SECTION 100 – FORWARD PRICING (AEMP → DPMQ)
+# ------------------------------
 
-    elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
-        # Step 1: Calculate vials needed
-        vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
+    run_section100_efc_forward(
+        input_price=input_price,
+        pricing_qty=pricing_qty,
+        vial_content=vial_content,
+        max_amount=max_amount,
+        consider_wastage=consider_wastage,
+        hospital_setting=hospital_setting
+    )
 
-        # Step 2: Calculate AEMP for maximum amount
-        aemp_max = calculate_aemp_max(input_price, vials_needed, pricing_qty)
+# ------------------------------
+# 🔁 SECTION 100 – EFC INVERSE (DPMQ → AEMP)
+# ------------------------------
+elif selected_section == "Section 100 – EFC" and price_type == "DPMQ":
+    run_section100_efc_inverse(
+        input_price=input_price,
+        pricing_qty=pricing_qty,
+        vial_content=vial_content,
+        max_amount=max_amount,
+        consider_wastage=consider_wastage,
+        hospital_setting=hospital_setting
+    )
 
-        # Step 3: AHI Fee & Wholesale Markup
-        ahi_fee = calculate_ahi_fee_efc(hospital_setting)
-
-        if hospital_setting == "Private":
-            markup = (aemp_max * Decimal("0.014")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        else:
-            markup = Decimal("0.00")
-
-        # Step 4: Final DPMQ
-        dpmq = aemp_max + markup + ahi_fee
-
-        # Step 5: Display result
-        st.markdown("### 📤 SECTION 100 – FORWARD PRICING (AEMP → DPMQ)")
-        st.write(f"**Hospital setting:** {hospital_setting}")
-        st.write(f"**Vials needed:** {vials_needed}")
-        st.write(f"**AEMP for Max Amount:** ${aemp_max:.2f}")
-        st.write(f"• Wholesale Markup: ${markup:.2f}")
-        st.write(f"• AHI Fee: ${ahi_fee:.2f}")
-        st.write(f"• Final DPMQ: ${dpmq:.2f}")
-
-        # Step 6: Show cost breakdown
-        display_cost_breakdown(
-            aemp_max_qty=aemp_max,
-            unit_aemp=None,
-            wholesale_markup=markup,
-            price_to_pharmacist=aemp_max + markup,
-            ahi_fee=ahi_fee,
-            dispensing_fee=Decimal("0.00"),
-            dangerous_fee=Decimal("0.00"),
-            final_price=dpmq,
-            label="DPMQ"
-        )
-
-        # Step 7: Export to Excel
-        df = generate_cost_breakdown_df(
-            aemp_max, None, markup,
-            aemp_max + markup, ahi_fee,
-            Decimal("0.00"), Decimal("0.00"),
-            dpmq, label="DPMQ"
-        )
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
-
-        st.download_button(
-            label="📅 Download DPMQ Breakdown in Excel",
-            data=buffer.getvalue(),
-            file_name="section100_forward_dpmq.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
+    
     # ------------------------------ 
     # 🔄 SECTION 85 – FORWARD CALCULATOR (AEMP → DPMQ)
     # ------------------------------ 
