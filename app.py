@@ -498,6 +498,62 @@ def display_cost_breakdown(
         else:
             st.error(message)
 
+# ------------------------------
+# 🔄 SECTION 100 – EFC INVERSE EXECUTION BLOCK
+# ------------------------------
+
+def run_section100_efc_inverse(input_price, pricing_qty, vial_content, max_amount, consider_wastage, hospital_setting):
+    st.session_state['original_input_price'] = input_price
+
+    # Step 1: Remove AHI Fee
+    dpmq_input = Decimal(input_price)
+    ahi_fee = calculate_ahi_fee_efc(hospital_setting)
+    subtotal = dpmq_input - ahi_fee
+
+    # Step 2: Remove wholesale markup (if private)
+    if hospital_setting == "Private":
+        price_to_pharmacist = (subtotal / Decimal("1.014")).quantize(Decimal("0.06"), rounding=ROUND_HALF_UP)
+        markup = subtotal - price_to_pharmacist
+    else:
+        price_to_pharmacist = subtotal
+        markup = Decimal("0.00")
+
+    # Step 3: Reconstruct AEMP (total → unit)
+    vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+    total_aemp = price_to_pharmacist * Decimal(pricing_qty)
+    aemp_max_qty = (total_aemp / Decimal(vials_needed)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    # Final output
+    display_cost_breakdown(
+        aemp_max_qty=aemp_max_qty,
+        unit_aemp=None,
+        wholesale_markup=markup,
+        price_to_pharmacist=price_to_pharmacist,
+        ahi_fee=ahi_fee,
+        dispensing_fee=Decimal("0.00"),
+        dangerous_fee=Decimal("0.00"),
+        final_price=dpmq_input,
+        label="DPMQ"
+    )
+
+    # Export
+    df = generate_cost_breakdown_df(
+        aemp_max_qty, None, markup,
+        price_to_pharmacist, ahi_fee,
+        Decimal("0.00"), Decimal("0.00"),
+        dpmq_input, label="DPMQ"
+    )
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+
+    st.download_button(
+        label="📅 Download DPMQ Breakdown in Excel",
+        data=buffer.getvalue(),
+        file_name="section100_inverse_dpmq.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 # 5. 📄 SECTION 85 – OUTPUT BREAKDOWN  ✅ CONFIG CONSTANTS MIGRATED
 
 # ----------------------------------------
@@ -587,7 +643,7 @@ elif selected_section == "Section 100 – EFC" and price_type == "DPMQ":
     # ------------------------------ 
     # 🔄 SECTION 85 – FORWARD CALCULATOR (AEMP → DPMQ)
     # ------------------------------ 
-    elif selected_section == "Section 85" and price_type == "AEMP":
+elif selected_section == "Section 85" and price_type == "AEMP":
         dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
 
         # Forward: AEMP → DPMQ
