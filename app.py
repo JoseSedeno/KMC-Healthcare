@@ -557,78 +557,84 @@ def run_section100_efc_inverse(input_price, pricing_qty, vial_content, max_amoun
 # 5. 📄 SECTION 85 – OUTPUT BREAKDOWN  ✅ CONFIG CONSTANTS MIGRATED
 
 # ----------------------------------------
-# 🔹 SECTION 85 – RIGHT PANEL OUTPUT LOGIC
+# 🔹 SECTION 85 – OUTPUT EXECUTION
 # ----------------------------------------
 
-from config import PBS_CONSTANTS
+if selected_section == "Section 85" and price_type == "DPMQ":
+    st.session_state['original_input_price'] = input_price
 
-# ⛔ DO NOT redefine right_col here — already defined in Section 3
-# ✅ Use the existing right_col
+    dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
+    tier = get_inverse_tier_type(input_price)
 
-with right_col:
+    effective_dpmq = Decimal(input_price) - DANGEROUS_FEE if include_dangerous_fee else Decimal(input_price)
 
-    # ------------------------------ 
-    # 🔁 SECTION 85 – INVERSE CALCULATOR (DPMQ → AEMP)
-    # ------------------------------ 
-    if selected_section == "Section 85" and price_type == "DPMQ":
-        st.session_state['original_input_price'] = input_price
+    aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
+    unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
+    wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
+    price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
+    ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
+    dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
+    dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
 
-        dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
-        tier = get_inverse_tier_type(input_price)
-
-        # Adjust input DPMQ to subtract dangerous fee if toggle is on
-        effective_dpmq = Decimal(input_price) - DANGEROUS_FEE if include_dangerous_fee else Decimal(input_price)
-
-        # Inverse: DPMQ → AEMP
-        aemp_max_qty = calculate_inverse_aemp_max(effective_dpmq, dispensing_fee, tier)
-        unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_qty)
-        wholesale_markup = calculate_inverse_wholesale_markup(aemp_max_qty)
-        price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
-        ahi_fee = calculate_inverse_ahi_fee(price_to_pharmacist)
-        dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
-
-        dpmq = price_to_pharmacist + ahi_fee + dispensing_fee + dangerous_fee
-
-        display_cost_breakdown(
-            aemp_max_qty, unit_aemp, wholesale_markup,
-            price_to_pharmacist, ahi_fee, dispensing_fee,
-            dangerous_fee, dpmq, label="DPMQ"
-        )
-
-        # Export – Inverse
-        df = generate_cost_breakdown_df(
-            aemp_max_qty, unit_aemp, wholesale_markup,
-            price_to_pharmacist, ahi_fee, dispensing_fee,
-            dangerous_fee, dpmq, label="DPMQ"
-        )
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
-
-        st.download_button(
-            label="📅 Download DPMQ Breakdown in Excel",
-            data=buffer.getvalue(),
-            file_name="dpmpq_breakdown.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-# ------------------------------
-# 📤 SECTION 100 – FORWARD PRICING (AEMP → DPMQ)
-# ------------------------------
-elif selected_section == "Section 100 - EFC" and price_type == "AEMP":
-    run_section100_efc_forward(
-        input_price=input_price,
-        pricing_qty=pricing_qty,
-        vial_content=vial_content,
-        max_amount=max_amount,
-        consider_wastage=consider_wastage,
-        hospital_setting=hospital_setting
+    display_cost_breakdown(
+        aemp_max_qty, unit_aemp, wholesale_markup,
+        price_to_pharmacist, ahi_fee, dispensing_fee,
+        dangerous_fee, dpmq, label="DPMQ"
     )
 
-# ------------------------------
-# 🔁 SECTION 100 – EFC INVERSE (DPMQ → AEMP)
-# ------------------------------
-elif selected_section == "Section 100 - EFC" and price_type == "DPMQ":
+    df = generate_cost_breakdown_df(
+        aemp_max_qty, unit_aemp, wholesale_markup,
+        price_to_pharmacist, ahi_fee, dispensing_fee,
+        dangerous_fee, dpmq, label="DPMQ"
+    )
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+
+    st.download_button(
+        label="📅 Download DPMQ Breakdown in Excel",
+        data=buffer.getvalue(),
+        file_name="dpmpq_breakdown.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+elif selected_section == "Section 85" and price_type == "AEMP":
+    dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
+
+    aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
+    wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
+    price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
+    ahi_fee = calculate_ahi_fee(price_to_pharmacist)
+    dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
+    dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
+
+    display_cost_breakdown(
+        aemp_max_qty, None, wholesale_markup,
+        price_to_pharmacist, ahi_fee, dispensing_fee,
+        dangerous_fee, dpmq, label="AEMP"
+    )
+
+    df = generate_cost_breakdown_df(
+        aemp_max_qty, None, wholesale_markup,
+        price_to_pharmacist, ahi_fee, dispensing_fee,
+        dangerous_fee, dpmq, label="AEMP"
+    )
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+
+    st.download_button(
+        label="📅 Download AEMP Breakdown in Excel",
+        data=buffer.getvalue(),
+        file_name="aemp_breakdown.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+# ----------------------------------------
+# 🔹 SECTION 100 – EFC OUTPUT EXECUTION
+# ----------------------------------------
+
+elif selected_section == "Section 100 – EFC" and price_type == "DPMQ":
     run_section100_efc_inverse(
         input_price=input_price,
         pricing_qty=pricing_qty,
@@ -637,44 +643,16 @@ elif selected_section == "Section 100 - EFC" and price_type == "DPMQ":
         consider_wastage=consider_wastage,
         hospital_setting=hospital_setting
     )
-    
-    # ------------------------------ 
-    # 🔄 SECTION 85 – FORWARD CALCULATOR (AEMP → DPMQ)
-    # ------------------------------ 
-elif selected_section == "Section 85" and price_type == "AEMP":
-        dispensing_fee = PBS_CONSTANTS["DISPENSING_FEE"]
 
-        # Forward: AEMP → DPMQ
-        aemp_max_qty = calculate_aemp_max_qty(input_price, pricing_qty, max_qty)
-        wholesale_markup = calculate_wholesale_markup(aemp_max_qty)
-        price_to_pharmacist = calculate_price_to_pharmacist(aemp_max_qty, wholesale_markup)
-        ahi_fee = calculate_ahi_fee(price_to_pharmacist)
-        dangerous_fee = PBS_CONSTANTS["DANGEROUS_FEE"] if include_dangerous_fee else Decimal("0.00")
-
-        dpmq = calculate_dpmq(price_to_pharmacist, ahi_fee, include_dangerous_fee)
-
-        display_cost_breakdown(
-            aemp_max_qty, None, wholesale_markup,
-            price_to_pharmacist, ahi_fee, dispensing_fee,
-            dangerous_fee, dpmq, label="AEMP"
-        )
-
-        # Export – Forward
-        df = generate_cost_breakdown_df(
-            aemp_max_qty, None, wholesale_markup,
-            price_to_pharmacist, ahi_fee, dispensing_fee,
-            dangerous_fee, dpmq, label="AEMP"
-        )
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
-
-        st.download_button(
-            label="📅 Download AEMP Breakdown in Excel",
-            data=buffer.getvalue(),
-            file_name="aemp_breakdown.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
+    run_section100_efc_forward(
+        input_price=input_price,
+        pricing_qty=pricing_qty,
+        vial_content=vial_content,
+        max_amount=max_amount,
+        consider_wastage=consider_wastage,
+        hospital_setting=hospital_setting
+    )
 
 # ----------------------
 # 🔹 COST BREAKDOWN (Visuals & Exports)
@@ -726,10 +704,8 @@ def display_cost_breakdown(
         st.write(f"**Dangerous drug fee:** {format_currency(dangerous_fee)}")
     st.markdown(f"### 💊 {'Reconstructed DPMQ' if label == 'DPMQ' else 'DPMQ'}: **{format_currency(final_price)}**")
 
-    # Add enhanced precision validation display
     if label == "DPMQ":
-        # Validate that our inverse calculation is accurate
-        original_dpmq = st.session_state.get('original_input_price', final_price)  # TODO: Accept as argument instead
+        original_dpmq = st.session_state.get('original_input_price', final_price)
         is_valid, message = validate_calculation_precision_enhanced(original_dpmq, final_price)
         if is_valid:
             st.success(message)
