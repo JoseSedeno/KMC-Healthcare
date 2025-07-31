@@ -9,6 +9,8 @@ from decimal import Decimal, ROUND_HALF_UP, getcontext
 import io
 import os
 from config import PBS_CONSTANTS
+from helpers_section100_EFC import run_section100_efc_forward
+
 
 
 # Optional: Ensures Excel export works (can be removed if handled in requirements.txt)
@@ -128,36 +130,6 @@ with left_col:
         """, unsafe_allow_html=True)
 
 # 4. 📦 SECTION 85 – CALCULATION FUNCTIONS
-
-# ------------------------------
-# 🔹 SECTION 100 – EFC FORWARD HELPERS
-# ------------------------------
-
-from math import ceil
-
-def calculate_vials_needed(max_amount, vial_content, consider_wastage):
-    max_amount = Decimal(max_amount)
-    vial_content = Decimal(vial_content)
-
-    if consider_wastage:
-        return Decimal(ceil(max_amount / vial_content))
-    else:
-        return max_amount / vial_content  # allow decimal vials if no wastage considered
-
-def calculate_aemp_max(ex_manufacturer_price, vials_needed, pricing_qty):
-    total_cost = Decimal(ex_manufacturer_price) * Decimal(vials_needed)
-    return total_cost / Decimal(pricing_qty)
-
-def calculate_ahi_fee_efc(setting):
-    if setting == "Public":
-        return Decimal("90.13")
-    elif setting == "Private":
-        return Decimal("134.8")
-    else:
-        return Decimal("0.00")
-
-# Set higher precision for financial calculations
-getcontext().prec = 28
 
 # ----------------------
 # 🔹 PRECISION HELPERS
@@ -655,64 +627,5 @@ elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
         consider_wastage=consider_wastage,
         hospital_setting=hospital_setting
     )
-
-# ----------------------
-# 🔹 COST BREAKDOWN (Visuals & Exports)
-# ----------------------
-
-def format_currency(amount):
-    """Format Decimal as currency with consistent precision"""
-    return f"${to_decimal(amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
-
-def generate_cost_breakdown_df(
-    aemp_max_qty, unit_aemp, wholesale_markup,
-    price_to_pharmacist, ahi_fee, dispensing_fee,
-    dangerous_fee, final_price, label="AEMP"
-):
-    data = [["AEMP for max quantity", format_currency(aemp_max_qty)]]
-
-    if unit_aemp is not None:
-        data.append(["Unit AEMP", format_currency(unit_aemp)])
-
-    data.extend([
-        ["Wholesale markup", format_currency(wholesale_markup)],
-        ["Price to pharmacist", format_currency(price_to_pharmacist)],
-        ["AHI fee", format_currency(ahi_fee)],
-        ["Dispensing fee", format_currency(dispensing_fee)]
-    ])
-
-    if to_decimal(dangerous_fee) > 0:
-        data.append(["Dangerous drug fee", format_currency(dangerous_fee)])
-
-    label_row = "DPMQ" if label == "DPMQ" else "Final Price"
-    data.append([label_row, format_currency(final_price)])
-
-    return pd.DataFrame(data, columns=["Component", "Amount"])
-
-def display_cost_breakdown(
-    aemp_max_qty, unit_aemp, wholesale_markup,
-    price_to_pharmacist, ahi_fee, dispensing_fee,
-    dangerous_fee, final_price, label="AEMP"
-):
-    st.markdown(f"### 💰 COST BREAKDOWN ({label})")
-    st.write(f"**AEMP for max quantity:** {format_currency(aemp_max_qty)}")
-    if unit_aemp is not None:
-        st.write(f"**Unit AEMP:** {format_currency(unit_aemp)}")
-    st.write(f"**Wholesale markup:** {format_currency(wholesale_markup)}")
-    st.write(f"**Price to pharmacist:** {format_currency(price_to_pharmacist)}")
-    st.write(f"**AHI fee:** {format_currency(ahi_fee)}")
-    st.write(f"**Dispensing fee:** {format_currency(dispensing_fee)}")
-    if to_decimal(dangerous_fee) > 0:
-        st.write(f"**Dangerous drug fee:** {format_currency(dangerous_fee)}")
-    st.markdown(f"### 💊 {'Reconstructed DPMQ' if label == 'DPMQ' else 'DPMQ'}: **{format_currency(final_price)}**")
-
-    if label == "DPMQ":
-        original_dpmq = st.session_state.get('original_input_price', final_price)
-        is_valid, message = validate_calculation_precision_enhanced(original_dpmq, final_price)
-        if is_valid:
-            st.success(message)
-        else:
-            st.error(message)
-
 
 
