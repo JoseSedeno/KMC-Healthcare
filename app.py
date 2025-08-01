@@ -9,7 +9,8 @@ from decimal import Decimal, ROUND_HALF_UP, getcontext
 import io
 import os
 from config import PBS_CONSTANTS
-from helpers_section100_EFC import run_section100_efc_forward
+from helpers_section100_EFC import run_section100_efc_forward, run_section100_efc_inverse
+
 
 
 
