@@ -18,11 +18,11 @@ def calculate_unit_aemp(aemp_max_qty, pricing_qty, max_amount):
 def calculate_wholesale_markup_private(aemp_max_qty):
     return Decimal(aemp_max_qty) * Decimal("0.014")
 
-def calculate_ahi_fee(hospital_setting, ptp):
+def calculate_ahi_fee_fixed(hospital_setting):
     if hospital_setting == "Public":
-        return ptp * Decimal("0.2197")
+        return Decimal("90.13")
     else:
-        return ptp * Decimal("0.3994")
+        return Decimal("134.80")
 
 def run_section100_efc_forward(input_price, pricing_qty, vial_content, max_amount, consider_wastage, hospital_setting):
     aemp = Decimal(input_price)
@@ -37,19 +37,39 @@ def run_section100_efc_forward(input_price, pricing_qty, vial_content, max_amoun
         wholesale_markup = Decimal("0.00")
 
     ptp = aemp_max_qty + wholesale_markup
-    ahi_fee = calculate_ahi_fee(hospital_setting, ptp)
+    ahi_fee = calculate_ahi_fee_fixed(hospital_setting)
     dpma = ptp + ahi_fee
+
     unit_aemp = aemp_max_qty * pricing_qty / max_amount
 
-    return {
-        "aemp": aemp,
-        "aemp_max_qty": aemp_max_qty,
-        "unit_aemp": unit_aemp,
-        "wholesale_markup": wholesale_markup,
-        "price_to_pharmacist": ptp,
-        "ahi_fee": ahi_fee,
-        "dpma": dpma
-    }
+    display_cost_breakdown(
+        aemp_max_qty=aemp_max_qty,
+        unit_aemp=unit_aemp,
+        wholesale_markup=wholesale_markup,
+        price_to_pharmacist=ptp,
+        ahi_fee=ahi_fee,
+        dispensing_fee=Decimal("0.00"),
+        dangerous_fee=Decimal("0.00"),
+        final_price=dpma,
+        label="AEMP"
+    )
+
+    df = generate_cost_breakdown_df(
+        aemp_max_qty, unit_aemp, wholesale_markup,
+        ptp, ahi_fee,
+        Decimal("0.00"), Decimal("0.00"),
+        dpma, label="AEMP"
+    )
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
+
+    st.download_button(
+        label="📅 Download AEMP Breakdown in Excel",
+        data=buffer.getvalue(),
+        file_name="section100_forward_aemp.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # ----------------------------
 # 🔁 DPMQ → AEMP (Inverse Logic)
@@ -57,15 +77,16 @@ def run_section100_efc_forward(input_price, pricing_qty, vial_content, max_amoun
 
 def calculate_ahi_fee_efc(hospital_setting):
     if hospital_setting == "Public":
-        return Decimal("0.2197")
+        return Decimal("90.13")
     else:
-        return Decimal("0.3994")
+        return Decimal("134.80")
 
 def calculate_vials_needed(max_amount, vial_content, consider_wastage):
     max_amount = Decimal(max_amount)
     vial_content = Decimal(vial_content)
+
     if consider_wastage:
-        return Decimal(math.ceil(max_amount / vial_content))
+        return math.ceil(max_amount / vial_content)
     else:
         return max_amount / vial_content
 
@@ -73,10 +94,9 @@ def run_section100_efc_inverse(input_price, pricing_qty, vial_content, max_amoun
     st.session_state['original_input_price'] = input_price
     dpmq_input = Decimal(input_price)
 
-    # Step 1: Remove AHI Fee using inverse rate
-    ahi_rate = calculate_ahi_fee_efc(hospital_setting)
-    subtotal = dpmq_input / (Decimal("1.0") + ahi_rate)
-    ahi_fee = dpmq_input - subtotal  # or: dpmq_input * ahi_rate / (1 + ahi_rate)
+    # Step 1: Remove AHI Fee
+    ahi_fee = calculate_ahi_fee_efc(hospital_setting)
+    subtotal = dpmq_input - ahi_fee
 
     # Step 2: Remove wholesale markup
     if hospital_setting == "Private":
@@ -86,7 +106,7 @@ def run_section100_efc_inverse(input_price, pricing_qty, vial_content, max_amoun
         price_to_pharmacist = subtotal
         markup = Decimal("0.00")
 
-    # Step 3: Reconstruct AEMP (max qty)
+    # Step 3: Reconstruct AEMP (total → unit)
     vials_needed = calculate_vials_needed(max_amount, vial_content, consider_wastage)
     total_aemp = price_to_pharmacist * Decimal(pricing_qty)
     aemp_max_qty = total_aemp / Decimal(vials_needed)
@@ -120,12 +140,3 @@ def run_section100_efc_inverse(input_price, pricing_qty, vial_content, max_amoun
         file_name="section100_inverse_dpmq.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-    return {
-        "aemp_max_qty": aemp_max_qty,
-        "wholesale_markup": markup,
-        "price_to_pharmacist": price_to_pharmacist,
-        "ahi_fee": ahi_fee,
-        "final_price": dpmq_input
-    }
-
