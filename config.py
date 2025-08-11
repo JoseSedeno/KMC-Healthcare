@@ -26,5 +26,11 @@ PBS_CONSTANTS = {
     },
 
     # 📈 Max AEMP for Tier 2 before Tier 3 flat fee applies
-    "WHOLESALE_TIER2_CAP": Decimal("720.00")
+    "WHOLESALE_TIER2_CAP": Decimal("720.00"),
+
+    # 🏥 Section 100 – Efficient Funding of Chemotherapy (EFC)
+    "EFC_AHI_PUBLIC": Decimal("90.13"),
+    "EFC_AHI_PRIVATE": Decimal("134.80"),
+    "EFC_PRIVATE_MARKUP_RATE": Decimal("0.014"),
+    "EFC_PRIVATE_MARKUP_MULTIPLIER": Decimal("1.014"),
 }
