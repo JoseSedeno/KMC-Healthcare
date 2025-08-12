@@ -87,7 +87,6 @@ def calculate_vials_needed(max_amount: Decimal, vial_content: Decimal, consider_
 # ==============================
 # Forward: AEMP -> DPMA (shown as DPMQ label in UI)
 # ==============================
-
 def run_section100_efc_forward(
     input_price,
     pricing_qty,
@@ -97,9 +96,9 @@ def run_section100_efc_forward(
     hospital_setting: str
 ) -> None:
     """
-    Forward path for Section 100 EFC:
-      INPUT  : unit AEMP (ex-manufacturer)
-      OUTPUT : DPMA (PtP + AHI; no dispensing or dangerous fees for EFC)
+    Section 100 EFC forward:
+      DPMA = AEMP_for_max + wholesale_markup(private only) + fixed AHI
+      (No dispensing or dangerous fees for EFC)
     """
 
     # Basic validation
@@ -107,34 +106,31 @@ def run_section100_efc_forward(
     _validate_positive("Maximum amount (mg)", max_amount)
     _validate_positive("Vial content (mg)", vial_content)
 
-    aemp_unit = D(input_price)
-    pricing_qty = D(pricing_qty)
-    max_amount = D(max_amount)
+    aemp_unit    = D(input_price)
+    pricing_qty  = D(pricing_qty)
+    vial_content = D(vial_content)
+    max_amount   = D(max_amount)
 
-    # AEMP for maximum amount
-    aemp_max_qty = aemp_unit * max_amount / pricing_qty
+    # 1) Work out vials needed (ceil if wastage ON), then scale by pricing quantity
+    vials_needed   = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+    aemp_for_max   = aemp_unit * (vials_needed / pricing_qty)   # <- matches PBS “AEMP for maximum amount”
 
-    # Private wholesale markup (Public: no markup)
+    # 2) Fees per hospital setting
     if hospital_setting == "Private":
-        wholesale_markup = calculate_wholesale_markup_private(aemp_max_qty)  # 1.4%
+        wholesale_markup = aemp_for_max * PBS_CONSTANTS["EFC_PRIVATE_MARKUP_RATE"]  # 1.4%
+        ahi_fee          = PBS_CONSTANTS["EFC_AHI_PRIVATE"]                          # 136.90
     else:
-        wholesale_markup = D("0.00")
+        wholesale_markup = D("0.00")                                                 # Public: no markup
+        ahi_fee          = PBS_CONSTANTS["EFC_AHI_PUBLIC"]                           # 91.23
 
-    # PtP analogue
-    ptp = aemp_max_qty + wholesale_markup
-
-    # Fixed AHI fee by setting (Public: 91.23, Private: 136.90)
-    ahi_fee = calculate_ahi_fee_fixed(hospital_setting)
-
-    # Final DPMA
+    # 3) Totals
+    ptp  = aemp_for_max + wholesale_markup
     dpma = ptp + ahi_fee
 
-    # Also show unit AEMP back to the user
-    unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_amount)
-
-    # UI breakdown
+    # 4) UI breakdown (show unit AEMP back to user)
+    unit_aemp = aemp_unit
     display_cost_breakdown(
-        aemp_max_qty=q(aemp_max_qty),
+        aemp_max_qty=q(aemp_for_max),
         unit_aemp=q(unit_aemp),
         wholesale_markup=q(wholesale_markup),
         price_to_pharmacist=q(ptp),
@@ -145,14 +141,13 @@ def run_section100_efc_forward(
         label="AEMP",
     )
 
-    # Download breakdown (Excel)
+    # 5) Download breakdown (Excel)
     df = generate_cost_breakdown_df(
-        q(aemp_max_qty), q(unit_aemp), q(wholesale_markup),
+        q(aemp_for_max), q(unit_aemp), q(wholesale_markup),
         q(ptp), q(ahi_fee),
         D("0.00"), D("0.00"),
         q(dpma), label="AEMP"
     )
-
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
