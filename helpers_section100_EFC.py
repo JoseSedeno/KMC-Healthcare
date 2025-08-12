@@ -84,7 +84,6 @@ def calculate_vials_needed(max_amount: Decimal, vial_content: Decimal, consider_
         return D(math.ceil(max_amount / vial_content))
     return max_amount / vial_content
 
-
 # ==============================
 # Forward: AEMP -> DPMA (shown as DPMQ label in UI)
 # ==============================
@@ -115,16 +114,16 @@ def run_section100_efc_forward(
     # AEMP for maximum amount
     aemp_max_qty = aemp_unit * max_amount / pricing_qty
 
-    # Private wholesale markup
+    # Private wholesale markup (Public: no markup)
     if hospital_setting == "Private":
-        wholesale_markup = calculate_wholesale_markup_private(aemp_max_qty)
+        wholesale_markup = calculate_wholesale_markup_private(aemp_max_qty)  # 1.4%
     else:
         wholesale_markup = D("0.00")
 
     # PtP analogue
     ptp = aemp_max_qty + wholesale_markup
 
-    # Fixed AHI fee by setting
+    # Fixed AHI fee by setting (Public: 91.23, Private: 136.90)
     ahi_fee = calculate_ahi_fee_fixed(hospital_setting)
 
     # Final DPMA
@@ -164,7 +163,6 @@ def run_section100_efc_forward(
         file_name="section100_forward_aemp.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
 
 # ==============================
 # Inverse: DPMA -> AEMP
