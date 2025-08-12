@@ -29,9 +29,9 @@ st.set_page_config(
 # ===============================
 
 # Pricing constants (easy to update in future)
-DISPENSING_FEE = Decimal("8.67")
-AHI_BASE = Decimal("4.79")
-DANGEROUS_FEE = Decimal("5.37")
+DISPENSING_FEE = Decimal("8.88")
+AHI_BASE = Decimal("4.91")
+DANGEROUS_FEE = Decimal("5.50")
 WHOLESALE_MARKUP_RATE = Decimal("0.0752")
 WHOLESALE_FLAT_FEE = Decimal("54.14")
 
@@ -510,6 +510,7 @@ elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
         consider_wastage=consider_wastage,
         hospital_setting=hospital_setting
     )
+
 
 
 
