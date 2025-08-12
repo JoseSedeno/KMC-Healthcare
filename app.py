@@ -10,6 +10,7 @@ import io
 import os
 from config import PBS_CONSTANTS
 from helpers_section100_EFC import run_section100_efc_forward, run_section100_efc_inverse
+from ui_helpers import display_cost_breakdown, generate_cost_breakdown_df
 
 # Optional: Ensures Excel export works (can be removed if handled in requirements.txt)
 os.system("pip install xlsxwriter")
@@ -26,8 +27,6 @@ st.set_page_config(
 # ===============================
 # 2. GLOBAL CONSTANTS – SECTION 85
 # ===============================
-
-from decimal import Decimal
 
 # Pricing constants (easy to update in future)
 DISPENSING_FEE = Decimal("8.67")
@@ -410,66 +409,6 @@ def calculate_inverse_dpmq(price_to_pharmacist, ahi_fee, dispensing_fee, include
     result = to_decimal(price_to_pharmacist) + to_decimal(ahi_fee) + to_decimal(dispensing_fee) + dangerous_fee
     return result.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-# ----------------------
-# 🔹 COST BREAKDOWN (Visuals & Exports)
-# ----------------------
-
-def format_currency(amount):
-    """Format Decimal as currency with consistent precision"""
-    return f"${to_decimal(amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}"
-
-def generate_cost_breakdown_df(
-    aemp_max_qty, unit_aemp, wholesale_markup,
-    price_to_pharmacist, ahi_fee, dispensing_fee,
-    dangerous_fee, final_price, label="AEMP"
-):
-    data = [["AEMP for max quantity", format_currency(aemp_max_qty)]]
-
-    if unit_aemp is not None:
-        data.append(["Unit AEMP", format_currency(unit_aemp)])
-
-    data.extend([
-        ["Wholesale markup", format_currency(wholesale_markup)],
-        ["Price to pharmacist", format_currency(price_to_pharmacist)],
-        ["AHI fee", format_currency(ahi_fee)],
-        ["Dispensing fee", format_currency(dispensing_fee)]
-    ])
-
-    if to_decimal(dangerous_fee) > 0:
-        data.append(["Dangerous drug fee", format_currency(dangerous_fee)])
-
-    label_row = "DPMQ" if label == "DPMQ" else "Final Price"
-    data.append([label_row, format_currency(final_price)])
-
-    return pd.DataFrame(data, columns=["Component", "Amount"])
-
-def display_cost_breakdown(
-    aemp_max_qty, unit_aemp, wholesale_markup,
-    price_to_pharmacist, ahi_fee, dispensing_fee,
-    dangerous_fee, final_price, label="AEMP"
-):
-    st.markdown(f"### 💰 COST BREAKDOWN ({label})")
-    st.write(f"**AEMP for max quantity:** {format_currency(aemp_max_qty)}")
-    if unit_aemp is not None:
-        st.write(f"**Unit AEMP:** {format_currency(unit_aemp)}")
-    st.write(f"**Wholesale markup:** {format_currency(wholesale_markup)}")
-    st.write(f"**Price to pharmacist:** {format_currency(price_to_pharmacist)}")
-    st.write(f"**AHI fee:** {format_currency(ahi_fee)}")
-    st.write(f"**Dispensing fee:** {format_currency(dispensing_fee)}")
-    if to_decimal(dangerous_fee) > 0:
-        st.write(f"**Dangerous drug fee:** {format_currency(dangerous_fee)}")
-    st.markdown(f"### 💊 {'Reconstructed DPMQ' if label == 'DPMQ' else 'DPMQ'}: **{format_currency(final_price)}**")
-
-    # Add enhanced precision validation display
-    if label == "DPMQ":
-        # Validate that our inverse calculation is accurate
-        original_dpmq = st.session_state.get('original_input_price', final_price)
-        is_valid, message = validate_calculation_precision_enhanced(original_dpmq, final_price)
-        if is_valid:
-            st.success(message)
-        else:
-            st.error(message)
-
 # ===============================
 # 5. 🚀 SECTION OUTPUT EXECUTION
 # ===============================
@@ -571,5 +510,6 @@ elif selected_section == "Section 100 – EFC" and price_type == "AEMP":
         consider_wastage=consider_wastage,
         hospital_setting=hospital_setting
     )
+
 
 
