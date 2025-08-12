@@ -2,14 +2,14 @@ from decimal import Decimal
 
 PBS_CONSTANTS = {
     # 💊 Dispensing & Handling Fees
-    "DISPENSING_FEE": Decimal("8.67"),
-    "DANGEROUS_FEE": Decimal("5.37"),
+    "DISPENSING_FEE": Decimal("8.88"),
+    "DANGEROUS_FEE": Decimal("5.50"),
 
     # 📦 AHI Fee Structure
-    "AHI_BASE": Decimal("4.79"),
+    "AHI_BASE": Decimal("4.91"),
     "AHI_TIER1_CAP": Decimal("100.00"),
     "AHI_TIER2_CAP": Decimal("2000.00"),
-    "AHI_MAX_FEE": Decimal("99.79"),
+    "AHI_MAX_FEE": Decimal("99.91"),
 
     # 🏷️ Wholesale Markup Structure
     "WHOLESALE_FIXED_FEE_TIER1": Decimal("0.41"),
@@ -29,8 +29,8 @@ PBS_CONSTANTS = {
     "WHOLESALE_TIER2_CAP": Decimal("720.00"),
 
     # 🏥 Section 100 – Efficient Funding of Chemotherapy (EFC)
-    "EFC_AHI_PUBLIC": Decimal("90.13"),
-    "EFC_AHI_PRIVATE": Decimal("134.80"),
+    "EFC_AHI_PUBLIC": Decimal("91.23"),
+    "EFC_AHI_PRIVATE": Decimal("136.90"),
     "EFC_PRIVATE_MARKUP_RATE": Decimal("0.014"),
     "EFC_PRIVATE_MARKUP_MULTIPLIER": Decimal("1.014"),
 }
