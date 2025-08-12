@@ -97,10 +97,9 @@ def run_section100_efc_forward(
 ) -> None:
     """
     Section 100 EFC forward:
-      DPMA = AEMP_for_max + wholesale_markup(private only) + fixed AHI
+      DPMA = AEMP_for_max + (private 1.4% markup if Private) + fixed AHI
       (No dispensing or dangerous fees for EFC)
     """
-
     # Basic validation
     _validate_positive("Pricing quantity", pricing_qty)
     _validate_positive("Maximum amount (mg)", max_amount)
@@ -111,23 +110,24 @@ def run_section100_efc_forward(
     vial_content = D(vial_content)
     max_amount   = D(max_amount)
 
-    # 1) Work out vials needed (ceil if wastage ON), then scale by pricing quantity
-    vials_needed   = calculate_vials_needed(max_amount, vial_content, consider_wastage)
-    aemp_for_max   = aemp_unit * (vials_needed / pricing_qty)   # <- matches PBS “AEMP for maximum amount”
+    # 1) Vials needed (ceil if wastage ON), then packs needed = vials / pricing_qty
+    vials_needed  = calculate_vials_needed(max_amount, vial_content, consider_wastage)
+    packs_needed  = vials_needed / pricing_qty
+    aemp_for_max  = aemp_unit * packs_needed         # <- correct "AEMP for maximum amount"
 
-    # 2) Fees per hospital setting
+    # 2) Fees by setting
     if hospital_setting == "Private":
         wholesale_markup = aemp_for_max * PBS_CONSTANTS["EFC_PRIVATE_MARKUP_RATE"]  # 1.4%
         ahi_fee          = PBS_CONSTANTS["EFC_AHI_PRIVATE"]                          # 136.90
     else:
-        wholesale_markup = D("0.00")                                                 # Public: no markup
+        wholesale_markup = D("0.00")
         ahi_fee          = PBS_CONSTANTS["EFC_AHI_PUBLIC"]                           # 91.23
 
     # 3) Totals
     ptp  = aemp_for_max + wholesale_markup
     dpma = ptp + ahi_fee
 
-    # 4) UI breakdown (show unit AEMP back to user)
+    # 4) UI breakdown (echo the input AEMP as the unit price)
     unit_aemp = aemp_unit
     display_cost_breakdown(
         aemp_max_qty=q(aemp_for_max),
@@ -151,7 +151,6 @@ def run_section100_efc_forward(
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
-
     st.download_button(
         label="📥 Download AEMP to DPMA breakdown (Excel)",
         data=buffer.getvalue(),
