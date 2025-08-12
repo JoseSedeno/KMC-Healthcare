@@ -10,15 +10,11 @@ import io
 import pandas as pd
 import streamlit as st
 
-# If you keep shared constants here, import them (even if not all are used directly)
-from config import PBS_CONSTANTS  # noqa: F401
-
-# These are UI helpers you said already exist in app.py
-from app import display_cost_breakdown, generate_cost_breakdown_df
+from config import PBS_CONSTANTS  # keep available if you expand logic
+from ui_helpers import display_cost_breakdown, generate_cost_breakdown_df
 
 # Tighter precision for financial math
 getcontext().prec = 28
-
 
 # ==============================
 # Utilities
@@ -44,12 +40,12 @@ def _validate_positive(name: str, value) -> None:
 
 
 # ==============================
-# Core Calculators (S100 – EFC)
+# Core Calculators (S100 EFC)
 # ==============================
 
 def calculate_unit_aemp(aemp_max_qty: Decimal, pricing_qty: Decimal, max_amount: Decimal) -> Decimal:
     """
-    Unit AEMP = AEMP(max amount) × pricing_qty / max_amount
+    Unit AEMP = AEMP(max amount) * pricing_qty / max_amount
     Keeps full precision; caller can round if desired.
     """
     return D(aemp_max_qty) * D(pricing_qty) / D(max_amount)
@@ -57,24 +53,22 @@ def calculate_unit_aemp(aemp_max_qty: Decimal, pricing_qty: Decimal, max_amount:
 
 def calculate_wholesale_markup_private(aemp_max_qty: Decimal) -> Decimal:
     """
-    Private hospital add-on: 1.4% of AEMP at maximum amount (ex-manufacturer),
-    expressed as a dollar markup on PtP-equivalent. For S100-EFC we treat it simply
-    as 1.4% × AEMP(max qty).
+    Private hospital add-on: 1.4 percent of AEMP at maximum amount.
     """
     return D(aemp_max_qty) * D("0.014")
 
 
 def calculate_ahi_fee_fixed(hospital_setting: str) -> Decimal:
     """
-    Fixed hospital handling / AHI fee by setting.
-    Public:  $90.13
-    Private: $134.80
+    Fixed AHI fee by setting.
+    Public:  90.13
+    Private: 134.80
     """
     return D("90.13") if hospital_setting == "Public" else D("134.80")
 
 
 def calculate_ahi_fee_efc(hospital_setting: str) -> Decimal:
-    """Alias used by inverse path (kept for compatibility with your code)."""
+    """Alias used by inverse path."""
     return calculate_ahi_fee_fixed(hospital_setting)
 
 
@@ -92,7 +86,7 @@ def calculate_vials_needed(max_amount: Decimal, vial_content: Decimal, consider_
 
 
 # ==============================
-# Forward: AEMP → DPMA (displayed as “DPMQ” label in UI)
+# Forward: AEMP -> DPMA (shown as DPMQ label in UI)
 # ==============================
 
 def run_section100_efc_forward(
@@ -104,13 +98,9 @@ def run_section100_efc_forward(
     hospital_setting: str
 ) -> None:
     """
-    Forward path for Section 100 – EFC:
+    Forward path for Section 100 EFC:
       INPUT  : unit AEMP (ex-manufacturer)
-      OUTPUT : DPMA (PtP + AHI; no dispensing / dangerous fees for EFC)
-    Notes:
-      • Common pattern is AEMP(unit) → AEMP(max amount) by scaling with max_amount/pricing_qty.
-      • Private setting adds 1.4% wholesale markup on AEMP(max amount).
-      • EFC uses fixed AHI fee by setting and no pharmacy fees.
+      OUTPUT : DPMA (PtP + AHI; no dispensing or dangerous fees for EFC)
     """
 
     # Basic validation
@@ -122,7 +112,7 @@ def run_section100_efc_forward(
     pricing_qty = D(pricing_qty)
     max_amount = D(max_amount)
 
-    # AEMP for maximum amount (no wastage logic applied on forward in your original code)
+    # AEMP for maximum amount
     aemp_max_qty = aemp_unit * max_amount / pricing_qty
 
     # Private wholesale markup
@@ -131,16 +121,16 @@ def run_section100_efc_forward(
     else:
         wholesale_markup = D("0.00")
 
-    # “Price to pharmacist” analogue (PtP): AEMP(max) + markup
+    # PtP analogue
     ptp = aemp_max_qty + wholesale_markup
 
     # Fixed AHI fee by setting
     ahi_fee = calculate_ahi_fee_fixed(hospital_setting)
 
-    # Final DPMA (labelled as “Final Price”/“DPMQ” in the UI helpers)
+    # Final DPMA
     dpma = ptp + ahi_fee
 
-    # Also show the implied unit AEMP back to the user for clarity
+    # Also show unit AEMP back to the user
     unit_aemp = calculate_unit_aemp(aemp_max_qty, pricing_qty, max_amount)
 
     # UI breakdown
@@ -169,7 +159,7 @@ def run_section100_efc_forward(
         df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
     st.download_button(
-        label="📥 Download AEMP → DPMA breakdown (Excel)",
+        label="📥 Download AEMP to DPMA breakdown (Excel)",
         data=buffer.getvalue(),
         file_name="section100_forward_aemp.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -177,7 +167,7 @@ def run_section100_efc_forward(
 
 
 # ==============================
-# Inverse: DPMA → AEMP
+# Inverse: DPMA -> AEMP
 # ==============================
 
 def run_section100_efc_inverse(
@@ -189,17 +179,16 @@ def run_section100_efc_inverse(
     hospital_setting: str
 ) -> None:
     """
-    Inverse path for Section 100 – EFC:
-      INPUT  : DPMA (what shows as “DPMQ” in generic UI)
+    Inverse path for Section 100 EFC:
+      INPUT  : DPMA (shown as DPMQ in the shared UI)
       OUTPUT : AEMP(max amount) and components, plus downloadable breakdown
     Steps:
       1) Remove fixed AHI fee for the selected setting.
-      2) If Private, remove 1.4% markup (divide by 1.014).
+      2) If Private, remove 1.4 percent markup (divide by 1.014).
       3) Reconstruct AEMP(max amount). If wastage is ON, use whole vials; else allow fractional vials.
-         The reconstruction uses: price_to_pharmacist * pricing_qty / vials_needed
     """
 
-    # Stash input for any on-screen precision checks your app does
+    # Stash input for on-screen precision checks
     st.session_state["original_input_price"] = input_price
 
     # Basic validation
@@ -222,7 +211,7 @@ def run_section100_efc_inverse(
         price_to_pharmacist = subtotal
         markup = D("0.00")
 
-    # 3) Reconstruct AEMP(max): first figure out vials needed for the max amount
+    # 3) Reconstruct AEMP(max)
     vials_needed = calculate_vials_needed(D(max_amount), D(vial_content), consider_wastage)
 
     if vials_needed == 0:
@@ -232,10 +221,10 @@ def run_section100_efc_inverse(
         # To get AEMP(max) per pricing unit, scale by pricing_qty / vials.
         aemp_max_qty = (price_to_pharmacist * D(pricing_qty)) / D(vials_needed)
 
-    # UI breakdown (label “DPMQ” to reuse the shared component styling)
+    # UI breakdown
     display_cost_breakdown(
         aemp_max_qty=q(aemp_max_qty),
-        unit_aemp=None,  # optional to display; leaving None hides the line
+        unit_aemp=None,
         wholesale_markup=q(markup),
         price_to_pharmacist=q(price_to_pharmacist),
         ahi_fee=q(ahi_fee),
@@ -258,7 +247,7 @@ def run_section100_efc_inverse(
         df.to_excel(writer, index=False, sheet_name="Cost Breakdown")
 
     st.download_button(
-        label="📥 Download DPMA → AEMP breakdown (Excel)",
+        label="📥 Download DPMA to AEMP breakdown (Excel)",
         data=buffer.getvalue(),
         file_name="section100_inverse_dpmq.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
