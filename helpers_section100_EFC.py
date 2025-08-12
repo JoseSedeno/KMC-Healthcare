@@ -61,10 +61,10 @@ def calculate_wholesale_markup_private(aemp_max_qty: Decimal) -> Decimal:
 def calculate_ahi_fee_fixed(hospital_setting: str) -> Decimal:
     """
     Fixed AHI fee by setting.
-    Public:  90.13
-    Private: 134.80
+    Public:  91.23
+    Private: 136.90
     """
-    return D("90.13") if hospital_setting == "Public" else D("134.80")
+    return D("91.23") if hospital_setting == "Public" else D("136.90")
 
 
 def calculate_ahi_fee_efc(hospital_setting: str) -> Decimal:
